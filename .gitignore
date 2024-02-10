@@ -1,4 +1,4 @@
 .goutupstream-*
 /Data/*
-/target/*
+/target/
 /test/*
