@@ -1,6 +1,6 @@
 services:
   cloudapp:
-    image: eclipse-temurin:11-jdk-alpine
+    image: maven:3.9-eclipse-temurin-11-alpine
     container_name: cloudapp
     volumes:
       - ./CloudApp:/workspace
