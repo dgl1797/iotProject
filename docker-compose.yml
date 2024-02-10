@@ -1,0 +1,21 @@
+services:
+  cloudapp:
+    image: eclipse-temurin:11-jdk-alpine
+    container_name: cloudapp
+    volumes:
+      - ./CloudApp:/workspace
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
+    entrypoint: /bin/sh
+
+  mysql:
+    image: mysql:8.0-debian
+    container_name: mysql
+    volumes:
+      - ./Data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=sensors
