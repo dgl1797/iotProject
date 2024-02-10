@@ -1,4 +1,4 @@
 .goutupstream-*
 /Data/*
-/target/
+/CloudApp/cloudapp/target/
 /test/*
