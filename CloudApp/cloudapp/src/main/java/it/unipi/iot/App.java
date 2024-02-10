@@ -1,4 +1,4 @@
-package it.iot;
+package it.unipi.iot;
 
 public class App {
     public static void main(String[] args) {

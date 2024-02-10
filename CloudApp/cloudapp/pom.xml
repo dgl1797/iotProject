@@ -4,7 +4,7 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>it.iot</groupId>
+  <groupId>it.unipi.iot</groupId>
   <artifactId>cloudapp</artifactId>
   <version>1.0.0</version>
 
@@ -33,7 +33,7 @@
               <manifest>
                 <addClasspath>true</addClasspath>
                 <classpathPrefix>lib/</classpathPrefix>
-                <mainClass>it.iot.App</mainClass>
+                <mainClass>it.unipi.iot.App</mainClass>
               </manifest>
             </archive>
           </configuration>
