@@ -34,7 +34,7 @@ static const char *broker_ip = MQTT_CLIENT_BROKER_IP_ADDR;
 
 /*------------------------STATES CONFIG----------------------------------*/
 static uint8_t state;
-static double temperature = 20; // starts from 20°C
+static signed char temperature = 20; // starts from 20°C
 
 #define STATE_INIT    		    0
 #define STATE_NET_OK    	    1
@@ -75,6 +75,20 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 /*------------------------MQTT MESSAGES SETUP END------------------------------*/
 
 /*------------------------MQTT EVENTS--------------------------------*/
+
+static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
+            uint16_t chunk_len){
+  /*printf("Pub Handler: topic='%s' (len=%u), chunk_len=%u\n", topic,
+          topic_len, chunk_len);*/
+/*
+  if(strcmp(topic, "actuator") == 0) {
+    printf("Received Actuator command\n");
+	printf("%s\n", chunk);
+    // Do something :)
+    return;
+  }*/
+}
+
 static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, void *data){
   switch (event){
     case MQTT_EVENT_CONNECTED:
@@ -128,7 +142,7 @@ void clean_buffer(char *buffer){
 void set_temperature(char* buffer){
   srand(time(NULL));
   // random increment {-1, 0, 1}
-  uint8_t rand_increment = (uint8_t)(rand() % 3);
+  signed char rand_increment = (signed char)(rand() % 3);
   rand_increment = (rand_increment == 2) ? -1 : rand_increment;
 
   // @TODO: check actuation state
@@ -137,14 +151,14 @@ void set_temperature(char* buffer){
   temperature += rand_increment;
 
   // buffer update with JSON formatted string
-  sprintf(buffer, "{\"temperature\":%u}", temperature);
+  sprintf(buffer, "{\"temperature\":%d}", temperature);
 }
 /*------------------------UTILITY FUNCTIONS END--------------------------------*/
 
 
 PROCESS_THREAD(environment_sensor, ev, data){
   PROCESS_BEGIN();
-  LOF_INFO("[ENV:INFO] - Node started\n");
+  LOG_INFO("[ENV:INFO] - Node started\n");
   // Initialize the ClientID as MAC address
   snprintf(client_id, BUFFER_SIZE, "%02x%02x%02x%02x%02x%02x",
                      linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1],
