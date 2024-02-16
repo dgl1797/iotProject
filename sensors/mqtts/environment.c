@@ -84,7 +84,7 @@ static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, vo
     case MQTT_EVENT_DISCONNECTED:
       LOG_INFO("[ENV:FAIL] - MQTT Disconnect. Reason %u\n", *((mqtt_event_t *)data));
       state = STATE_DISCONNECTED;
-      process_poll(&mqtt_client_process);
+      process_poll(&environment_sensor);
       break;
     case MQTT_EVENT_PUBLISH:
       msg_ptr = data;
@@ -152,7 +152,7 @@ PROCESS_THREAD(environment_sensor, ev, data){
                      linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
 
   // Broker registration and state initialization
-  mqtt_register(&conn, &mqtt_client_process, client_id, mqtt_event_handler, MAX_TCP_SEGMENT_SIZE);
+  mqtt_register(&conn, &environment_sensor, client_id, mqtt_event_handler, MAX_TCP_SEGMENT_SIZE);
   state=STATE_INIT;
 
   // Timers initialization
