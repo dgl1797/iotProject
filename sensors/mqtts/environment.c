@@ -193,7 +193,7 @@ PROCESS_THREAD(environment_sensor, ev, data){
 
       if(state == STATE_CONNECTED && etimer_expired(&publication_timer)){
 
-        LOG_INFO("[ENV:INFO] - Publishing new message in environment topic\n");
+        LOG_INFO("[ENV:INFO] - Publishing new message in %s topic\n", MQTT_TOPIC_NAME);
 
         sprintf(tenv_topic, "%s", MQTT_TOPIC_NAME);
 
