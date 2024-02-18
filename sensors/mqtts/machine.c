@@ -35,6 +35,8 @@ static const char *broker_ip = MQTT_CLIENT_BROKER_IP_ADDR;
 /*------------------------STATES CONFIG----------------------------------*/
 static uint8_t state;
 static signed char temperature = 20; // starts from 20°C
+static signed char humidity = 30; // starts from 30% humidity
+static unsigned short int output = 0; // starts from 0 output produced
 
 #define STATE_INIT    		    0
 #define STATE_NET_OK    	    1
@@ -52,7 +54,7 @@ static signed char temperature = 20; // starts from 20°C
 #define APP_BUFFER_SIZE           512
 
 static char client_id[BUFFER_SIZE];
-static char tenv_topic[BUFFER_SIZE];
+static char mdata_topic[BUFFER_SIZE];
 static char app_buffer[APP_BUFFER_SIZE];
 /*------------------------BUFFERS SETUP END-------------------------------------*/
 
@@ -65,7 +67,7 @@ static struct etimer publication_timer;
 /*------------------------TIMERS SETUP END-----------------------------------*/
 
 /*------------------------MQTT MESSAGES SETUP------------------------------*/
-#define MQTT_TOPIC_NAME "tenv"
+#define MQTT_TOPIC_NAME "mdata"
 static struct mqtt_message *msg_ptr = 0;
 
 static struct mqtt_connection conn;
@@ -95,11 +97,11 @@ static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *ch
 static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, void *data){
   switch (event){
     case MQTT_EVENT_CONNECTED:
-      LOG_INFO("[ENV:SUCCESS] - Mqtt Connection enstablished\n");
+      LOG_INFO("[MAH:SUCCESS] - Mqtt Connection enstablished\n");
       state = STATE_CONNECTED;
       break;
     case MQTT_EVENT_DISCONNECTED:
-      LOG_INFO("[ENV:FAIL] - MQTT Disconnect. Reason %u\n", *((mqtt_event_t *)data));
+      LOG_INFO("[MAH:FAIL] - MQTT Disconnect. Reason %u\n", *((mqtt_event_t *)data));
       state = STATE_DISCONNECTED;
       process_poll(&environment_sensor);
       break;
@@ -114,17 +116,17 @@ static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, vo
       );
       break;
     case MQTT_EVENT_SUBACK:
-      LOG_INFO("[ENV:SUCCESS] - Subscription Succesful\n");
+      LOG_INFO("[MAH:SUCCESS] - Subscription Succesful\n");
       break;
     case MQTT_EVENT_UNSUBACK:
-      LOG_INFO("[ENV:SUCCESS] - Unsubbed from environment topic\n");
+      LOG_INFO("[MAH:SUCCESS] - Unsubbed from environment topic\n");
       break;
     case MQTT_EVENT_PUBACK:
-      LOG_INFO("[ENV:SUCCESS] - Publication completed\n");
+      LOG_INFO("[MAH:SUCCESS] - Publication completed\n");
       break;
 
     default:
-      LOG_INFO("[ENV:WARN] - Application got a unhandled MQTT event: %i\n", event);
+      LOG_INFO("[MAH:WARN] - Application got a unhandled MQTT event: %i\n", event);
       break;
   }
 }
@@ -142,26 +144,29 @@ static bool have_connectivity(void){
 void clean_buffer(char *buffer){
   *buffer = '\0';
 }
-void set_temperature(char* buffer){
+void set_data(char* buffer){
   srand(time(NULL));
-  // random increment {-1, 0, 1}
-  signed char rand_increment = (signed char)(rand() % 3);
-  rand_increment = (rand_increment == 2) ? -1 : rand_increment;
+  // random increment {0, 1, 2}
+  signed char rand_tincrement = (signed char)(rand() % 3);
+  signed char rand_hincrement = ((signed char)(rand() % 11)) - ((signed char)5);
+  unsigned short int rand_oincrement = (unsigned short int)(rand() % 21);
 
   // @TODO: check actuation state
 
   // temperature update
-  temperature += rand_increment;
+  temperature += rand_tincrement;
+  humidity = temperature > 60 ? (10 + rand_hincrement) : 30 + rand_hincrement;
+  output = rand_oincrement;
 
   // buffer update with JSON formatted string
-  sprintf(buffer, "{\"temperature\":%d}", temperature);
+  sprintf(buffer, "{\"temperature\":%d, \"humidity\":%d, \"outputs\":%d}", temperature, humidity, output);
 }
 /*------------------------UTILITY FUNCTIONS END--------------------------------*/
 
 
 PROCESS_THREAD(environment_sensor, ev, data){
   PROCESS_BEGIN();
-  LOG_INFO("[ENV:INFO] - Node started\n");
+  LOG_INFO("[MAH:INFO] - Node started\n");
   // Initialize the ClientID as MAC address
   snprintf(client_id, BUFFER_SIZE, "%02x%02x%02x%02x%02x%02x",
                      linkaddr_node_addr.u8[0], linkaddr_node_addr.u8[1],
@@ -185,7 +190,7 @@ PROCESS_THREAD(environment_sensor, ev, data){
       if(state==STATE_INIT && have_connectivity()) state = STATE_NET_OK;
 
       if(state==STATE_NET_OK){
-        LOG_INFO("[ENV:INFO] - Connecting\n");
+        LOG_INFO("[MAH:INFO] - Connecting\n");
 
         memcpy(broker_address, broker_ip, strlen(broker_ip));
         mqtt_connect(&conn, broker_address, DEFAULT_BROKER_PORT,
@@ -196,14 +201,14 @@ PROCESS_THREAD(environment_sensor, ev, data){
 
       if(state == STATE_CONNECTED && etimer_expired(&publication_timer)){
 
-        LOG_INFO("[ENV:INFO] - Publishing new message in %s topic\n", MQTT_TOPIC_NAME);
+        LOG_INFO("[MAH:INFO] - Publishing new message in %s topic\n", MQTT_TOPIC_NAME);
 
-        sprintf(tenv_topic, "%s", MQTT_TOPIC_NAME);
+        sprintf(mdata_topic, "%s", MQTT_TOPIC_NAME);
 
 			  clean_buffer(app_buffer);
-        set_temperature(app_buffer);
+        set_data(app_buffer);
 
-        mqtt_publish(&conn, NULL, tenv_topic, (uint8_t *)app_buffer, strlen(app_buffer), 
+        mqtt_publish(&conn, NULL, mdata_topic, (uint8_t *)app_buffer, strlen(app_buffer), 
           MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF
         );
 
@@ -211,8 +216,8 @@ PROCESS_THREAD(environment_sensor, ev, data){
 
         etimer_set(&publication_timer, PUBLICATION_PERIOD);
       } else if (state == STATE_DISCONNECTED){
-        LOG_INFO("[ENV:FAIL] - Lost connection to MQTT Broker\n");
-        LOG_INFO("[ENV:INFO] - Reconnection Attempt...\n");
+        LOG_INFO("[MAH:FAIL] - Lost connection to MQTT Broker\n");
+        LOG_INFO("[MAH:INFO] - Reconnection Attempt...\n");
         mqtt_connect(&conn, broker_address, DEFAULT_BROKER_PORT,
           (DEFAULT_PUBLISH_INTERVAL * 3) / CLOCK_SECOND,
           MQTT_CLEAN_SESSION_ON
