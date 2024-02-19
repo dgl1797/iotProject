@@ -1,3 +1,5 @@
+package it.unipi.iot.MQTTHandler;
+
 import org.eclipse.californium.elements.exception.ConnectorException;
 import org.eclipse.paho.client.mqttv3.*;
 import org.json.simple.JSONObject;
@@ -16,7 +18,8 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
     private MqttClient mqttClient;
     BlockingDeque<String> queue;
 
-  public handler(String brokerUrl, String clientId, String topic) throws MqttException, ConnectorException, IOException, SQLException {
+    public Environment(String brokerUrl, String clientId, String topic)
+            throws MqttException, ConnectorException, IOException, SQLException {
         this.brokerUrl = brokerUrl;
         this.clientId = clientId;
         this.topic = topic;
@@ -69,7 +72,6 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         String msg = new String(mqttMessage.getPayload());
         // System.out.println(msg);
         queue.put(msg);
-
     }
 
     @Override
@@ -80,9 +82,9 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
     public void run() {
 
         int queueCapacity = queue.remainingCapacity();
-        int treshold = (int) (queueCapacity*0.75);
+        int treshold = (int) (queueCapacity * 0.75);
 
-        while(true){
+        while (true) {
             String msg = null;
             try {
                 msg = queue.take();
@@ -90,27 +92,28 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
                 System.err.println("[FAIL] - Error during taking message from MQTT queue");
             }
 
-            if (queue.size()>treshold){
-                for(int i = 0; i<1750; i++){
+            if (queue.size() > treshold) {
+                for (int i = 0; i < 1750; i++) {
                     queue.remove();
                 }
             }
             JSONObject json;
             try {
-                /*
-                PARSE AND TAKE DATA 
                 json = (JSONObject) JSONValue.parseWithException(msg);
-                int temperature = ((Number)json.get("temperature")).intValue();
-                //System.out.println("[INFO] - Taking data...");
-                //lightData.insertMotionData(idlight,lights,lightsDegree,brights,false);
-                Thread.sleep(1000);
+                int temperature = ((Number) json.get("temperature")).intValue();
+                System.out.println("[INFO] - Taking data...");
+                System.out.println(temperature);
+                /*
+                 * PARSE AND TAKE DATA
+                 * //lightData.insertMotionData(idlight,lights,lightsDegree,brights,false);
+                 * Thread.sleep(1000);
                  */
-            } catch (ParseException | InterruptedException | SQLException e) {
+            } catch (ParseException e) {
                 System.err.println("[FAIL] - Error during parsing JSON Message");
                 e.printStackTrace(System.err);
                 e.getMessage();
             }
-        
-
+        }
+    }
 
 }
