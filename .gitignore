@@ -2,3 +2,4 @@
 /Data/*
 /CloudApp/cloudapp/target/
 /test/*
+/CloudApp/cloudapp/environment-*/
