@@ -12,9 +12,9 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
 public class Environment implements MqttCallback, IMqttMessageListener, Runnable {
-    String brokerUrl; // Cambiare l'URL del broker MQTT se necessario
-    String clientId; // Un identificativo univoco per il client MQTT
-    String topic; // Il topic MQTT a cui inviare il payload
+    String brokerUrl;
+    String clientId;
+    String topic;
     private MqttClient mqttClient;
     BlockingDeque<String> queue;
 
@@ -29,7 +29,6 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         mqttClient.connect();
         mqttClient.subscribe(topic);
         System.out.println("[OK] - Connected to MQTT Broker. Subscribed to topic: " + topic);
-        new Thread(this).start();
     }
 
     @Override
