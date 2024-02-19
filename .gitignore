@@ -3,3 +3,5 @@
 /CloudApp/cloudapp/target/
 /test/*
 /CloudApp/cloudapp/environment-*/
+/CloudApp/cloudapp/machine-*/
+upload.sh

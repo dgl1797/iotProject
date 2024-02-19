@@ -6,6 +6,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import it.unipi.iot.Utils.Logger;
+
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.concurrent.BlockingDeque;
@@ -28,36 +30,36 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         mqttClient.setCallback(this);
         mqttClient.connect();
         mqttClient.subscribe(topic);
-        System.out.println("[ENV OK] - Connected to MQTT Broker. Subscribed to topic: " + topic);
+        Logger.SUCCESS("env", "Connected to MQTT Broker. Subscribed to topic: " + topic);
     }
 
     @Override
     public void connectionLost(Throwable throwable) {
-        System.out.println("[ENV FAIL] - Connection to MQTT Broker lost!");
+        Logger.ERROR("env", "Connection to MQTT Broker lost!");
         int reconnectTime = 3000;
         while (!mqttClient.isConnected()) {
             try {
                 Thread.sleep(reconnectTime);
             } catch (InterruptedException e) {
-                System.err.println("[ENV FAIL] - Error during reading waiting connection\n");
+                Logger.ERROR("env", "Error during reading waiting connection\n");
                 e.printStackTrace(System.err);
                 e.getMessage();
             }
-            System.out.println("[ENV INFO] - MQTT Reconnecting");
+            Logger.INFO("env", "MQTT Reconnecting");
             try {
                 mqttClient.connect();
-                System.out.println("[ENV OK] - MQTT Reconnetted");
+                Logger.SUCCESS("env", "MQTT Reconnetted");
 
             } catch (MqttException e) {
-                System.err.println("[ENV FAIL] - Error in connection to MQTT Broker\n");
+                Logger.ERROR("env", "Error in connection to MQTT Broker\n");
                 e.printStackTrace(System.err);
                 e.getMessage();
             }
             try {
                 mqttClient.subscribe(topic);
-                System.out.println("[ENV OK] - Connected to MQTT Broker. Subscribed to topic: " + topic);
+                Logger.SUCCESS("env", "Connected to MQTT Broker. Subscribed to topic: " + topic);
             } catch (MqttException e) {
-                System.err.println("[ENV FAIL] - Error in subsciption to " + topic + "\n");
+                Logger.ERROR("env", "Error in subsciption to " + topic + "\n");
                 e.printStackTrace(System.err);
                 e.getMessage();
             }
@@ -86,7 +88,7 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
             try {
                 msg = queue.take();
             } catch (InterruptedException e) {
-                System.err.println("[ENV FAIL] - Error during taking message from MQTT queue");
+                Logger.ERROR("env", "Error during taking message from MQTT queue");
             }
 
             if (queue.size() > treshold) {
@@ -94,15 +96,15 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
                     queue.remove();
                 }
             }
+
             JSONObject json;
             try {
                 json = (JSONObject) JSONValue.parseWithException(msg);
                 int temperature = ((Number) json.get("temperature")).intValue();
-                System.out.println("[ENV INFO] - Taking data...");
-                System.out.println(temperature);
+                Logger.INFO("env", String.format("New data received: %d", temperature));
 
             } catch (ParseException e) {
-                System.err.println("[ENV FAIL] - Error during parsing JSON Message");
+                Logger.ERROR("env", "Error during parsing JSON Message");
                 e.printStackTrace(System.err);
                 e.getMessage();
             }
