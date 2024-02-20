@@ -6,6 +6,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import it.unipi.iot.DAOs.EnvironmentDAO;
+import it.unipi.iot.Models.EnvironmentData;
 import it.unipi.iot.Utils.Logger;
 
 import java.io.IOException;
@@ -102,11 +104,15 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
                 json = (JSONObject) JSONValue.parseWithException(msg);
                 int temperature = ((Number) json.get("temperature")).intValue();
                 Logger.INFO("env", String.format("New data received: %d", temperature));
-
+                EnvironmentData storedData = EnvironmentDAO.saveData(new EnvironmentData(temperature));
+                if (storedData == null)
+                    throw new SQLException("Failed to store data");
+                Logger.SUCCESS("env", String.format("stored data: %s", storedData));
             } catch (ParseException e) {
                 Logger.ERROR("env", "Error during parsing JSON Message");
                 e.printStackTrace(System.err);
-                e.getMessage();
+            } catch (SQLException e) {
+                Logger.ERROR("env", "Failed to store data");
             }
         }
     }

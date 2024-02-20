@@ -9,6 +9,7 @@ import it.unipi.iot.Utils.Logger;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.TimeZone;
 
 import org.eclipse.californium.elements.exception.ConnectorException;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -22,9 +23,8 @@ public class App {
     public static void main(String[] args)
             throws MqttException, ConnectorException, IOException, SQLException, InterruptedException {
 
-        Logger.ERROR("cloud", "testing");
-        Logger.INFO("cloud", "testing");
-        Logger.SUCCESS("cloud", "testing");
+        // Server Setup
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         Logger.NORMAL("cloud", System.getenv("DB_STRING"));
 
         // MQTTs
@@ -39,5 +39,8 @@ public class App {
 
         Thread mahThread = new Thread(mah);
         mahThread.start();
+
+        System.out.println("\n");
+        Logger.SUCCESS("cloud", "Server Listening...");
     }
 }

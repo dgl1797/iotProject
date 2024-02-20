@@ -6,6 +6,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import it.unipi.iot.DAOs.MachineDAO;
+import it.unipi.iot.Models.MachineData;
 import it.unipi.iot.Utils.Logger;
 
 import java.io.IOException;
@@ -105,10 +107,15 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         int humidity = ((Number) json.get("humidity")).intValue();
         int outputs = ((Number) json.get("outputs")).intValue();
         Logger.INFO("mah", String.format("New data received: %d; %d; %d", temperature, humidity, outputs));
+        MachineData returnedData = MachineDAO.saveData(new MachineData(temperature, humidity, outputs));
+        if (returnedData == null)
+          throw new SQLException("Failed to store data");
+        Logger.SUCCESS("mah", String.format("stored data: %s", returnedData));
       } catch (ParseException e) {
         Logger.ERROR("mah", "Error during parsing JSON Message");
         e.printStackTrace(System.err);
-        e.getMessage();
+      } catch (SQLException e) {
+        Logger.ERROR("mah", "Failed to store data");
       }
     }
   }
