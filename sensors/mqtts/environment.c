@@ -145,8 +145,8 @@ void clean_buffer(char *buffer){
 void set_temperature(char* buffer){
   srand(time(NULL));
   // random increment {-1, 0, 1}
-  signed char rand_increment = (signed char)(rand() % 3);
-  rand_increment = (rand_increment == 2) ? -1 : rand_increment;
+  signed char rand_increment = (signed char)(rand() % 4);
+  rand_increment = (rand_increment == 2) ? -1 : rand_increment == 3 ? 2 : rand_increment;
 
   // @TODO: check actuation state
 

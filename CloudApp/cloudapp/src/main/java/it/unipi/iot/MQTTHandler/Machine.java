@@ -12,9 +12,7 @@ import it.unipi.iot.Utils.Logger;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
@@ -50,18 +48,29 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     Logger.SUCCESS("mah", "Connected to MQTT Broker. Subscribed to topic: " + topic);
   }
 
+  private String getTMode(int tval) {
+    return tval == 0 ? "OFF" : (tval == 1 ? "Medium" : "High");
+  }
+
+  private String getSMode(int sval) {
+    return sval == 0 ? "ON" : "OFF";
+  }
+
   public boolean notifyActuation(int switchVal, int tempVal) {
     /*
      * actuator: switchVal represents the state for the switching actuator, tempVal
      * the state for the cooling actuator
      */
+    ac_Ac_State[0] = tempVal;
+    ac_Ac_State[1] = switchVal;
     String content = String.format("{\"sv\":\"%d\",\"tv\":\"%d\"}", switchVal, tempVal);
     MqttMessage message = new MqttMessage(content.getBytes());
     try {
-      Logger.INFO("mah", "Trying to publish actuation message");
+      System.out.println("entering here");
       mqttClient.publish(content, message);
       Logger.SUCCESS("mah",
-          String.format("Switch value: %d, Temp value: %d, published correctly", switchVal, tempVal));
+          String.format("Switch state: %s; Cooler State: %s, published correctly", getSMode(switchVal),
+              getTMode(tempVal)));
       return true;
     } catch (MqttException e) {
       Logger.ERROR("mah", "Error during publishing phase");
@@ -142,18 +151,19 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         int humidity = ((Number) json.get("humidity")).intValue();
         int outputs = ((Number) json.get("outputs")).intValue();
         Logger.INFO("mah", String.format("New data received: %d; %d; %d", temperature, humidity, outputs));
+        if (productionHistory.size() > 3)
+          productionHistory.removeFirst();
+        productionHistory.addLast(outputs);
+        int mean = (int) Math.ceil(productionHistory.stream().reduce(0, Integer::sum) / 4);
+        // production level checks
+        if (productionHistory.size() > 3)
+          machineProductionLevelController(mean);
+        // temperature checks
+        machineTemperatureController(temperature);
         MachineData returnedData = MachineDAO.saveData(new MachineData(temperature, humidity, outputs));
         if (returnedData == null)
           throw new SQLException("Failed to store data");
         Logger.SUCCESS("mah", String.format("stored data: %s", returnedData));
-        if (productionHistory.size() > 3)
-          productionHistory.removeFirst();
-        productionHistory.addLast(temperature);
-        int mean = (int) Math.ceil(productionHistory.stream().reduce(0, Integer::sum) / 4);
-        // production level checks
-        machineProductionLevelController(mean);
-        // temperature checks
-        machineTemperatureController(temperature);
       } catch (ParseException e) {
         Logger.ERROR("mah", "Error during parsing JSON Message");
         e.printStackTrace(System.err);
@@ -164,36 +174,63 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   }
 
   // controller functions
-  void machineTemperatureController(int temperature) {
-    boolean ret;
+  boolean machineTemperatureController(int temperature) {
+    boolean ret = false;
     switch (ac_Ac_State[0]) {
       case 0:
         // no cooling
-        ret = temperature > tempTresh[2] ? notifyActuation(1, 0)
-            : (temperature > tempTresh[1] ? notifyActuation(0, 2)
-                : (temperature > tempTresh[0] ? notifyActuation(0, 1) : true));
+        if (temperature > tempTresh[2]) {
+          resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+        } else if (temperature > tempTresh[1]) {
+          Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
+          notifyActuation(0, 2);
+        } else if (temperature > tempTresh[0]) {
+          Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
+          notifyActuation(0, 1);
+        }
         break;
       case 1:
         // soft cooling alredy enabled
-        ret = temperature > tempTresh[2] ? notifyActuation(1, 0)
-            : (temperature > tempTresh[1] ? notifyActuation(0, 2)
-                : (temperature > tempTresh[0] - 10 ? true : notifyActuation(0, 0)));
+        if (temperature > tempTresh[2]) {
+          resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+        } else if (temperature > tempTresh[1]) {
+          Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
+          notifyActuation(0, 2);
+        } else if (temperature <= tempTresh[0] - 10) {
+          Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
+          notifyActuation(0, 0);
+        }
         break;
       case 2:
         // hard cooling alredy enabled
-        ret = temperature > tempTresh[2] ? notifyActuation(1, 0)
-            : (temperature > tempTresh[1] - 10 ? true
-                : (temperature > tempTresh[0] - 10 ? notifyActuation(0, 1) : notifyActuation(0, 0)));
+        if (temperature > tempTresh[2]) {
+          resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+        } else if (temperature <= tempTresh[0] - 10) {
+          Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
+          notifyActuation(0, 2);
+        } else if (temperature <= tempTresh[1] - 10) {
+          Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
+          notifyActuation(0, 0);
+        }
         break;
       default:
         break;
     }
+    return ret;
   }
 
   void machineProductionLevelController(int mean) {
-    if (mean < productionLevel[0] || mean > productionLevel[1]) {
-      Logger.ERROR("mah", "Problem occurred: production level too low");
-      notifyActuation(1, 0);
-    }
+    if (mean < productionLevel[0] || mean > productionLevel[1])
+      resetMachine("Problem occurred: production level anomaly detected: " + mean + " outputs/min");
+  }
+
+  void resetMachine(String message) {
+    Logger.ERROR("mah", message);
+    notifyActuation(1, 0);
+
+    // reset phase
+    ac_Ac_State[0] = 0;
+    ac_Ac_State[1] = 0;
+    productionHistory.clear();
   }
 }
