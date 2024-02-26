@@ -147,9 +147,9 @@ void clean_buffer(char *buffer){
 void set_data(char* buffer){
   srand(time(NULL));
   // random increment {0, 1, 2}
-  signed char rand_tincrement = (signed char)(rand() % 3);
+  signed char rand_tincrement = (signed char)((rand() % 3)+1);
   signed char rand_hincrement = ((signed char)(rand() % 11)) - ((signed char)5);
-  unsigned short int rand_oincrement = (unsigned short int)(rand() % 21);
+  unsigned short int rand_oincrement = (unsigned short int)(rand() % 31);
 
   // @TODO: check actuation state
 
