@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <time.h>
 
+/*--------------------------MACROS-------------------------------*/
+#define GET_STATE_STRING(state_value) state_value == 0 ? "OFF" : state_value == 1 ? "Heating" : "Cooling"
+/*--------------------------MACROS END-------------------------------*/
+
 /*----------------------PROCESS SETUP-----------------------------------*/
 PROCESS(environment_sensor, "helloworld process");
 AUTOSTART_PROCESSES(&environment_sensor);
@@ -34,7 +38,9 @@ static const char *broker_ip = MQTT_CLIENT_BROKER_IP_ADDR;
 
 /*------------------------STATES CONFIG----------------------------------*/
 static uint8_t state;
-static signed char temperature = 20; // starts from 20°C
+static bool subbed = false; // unsubbed
+static signed char temperature = 30; // starts from 20°C
+static signed char actuator_state = 0; // OFF
 
 #define STATE_INIT    		    0
 #define STATE_NET_OK    	    1
@@ -79,6 +85,11 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
             uint16_t chunk_len){
   
+  if(strcmp(topic, "actuators/env_state") == 0){
+    // Actuator changed its state
+    LOG_INFO("[ENV:INFO] - Received actuator change state: Actual -> '%s'; New -> '%s'\n", GET_STATE_STRING(actuator_state), chunk);
+    // JSON Parsing
+  }
   // handler if the mqtt needs to do some action on publish
 
   /*printf("Pub Handler: topic='%s' (len=%u), chunk_len=%u\n", topic,
@@ -114,7 +125,7 @@ static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, vo
       );
       break;
     case MQTT_EVENT_SUBACK:
-      LOG_INFO("[ENV:SUCCESS] - Subscription Succesful\n");
+      LOG_INFO("[ENV:SUCCESS] - Subscription Successful\n");
       break;
     case MQTT_EVENT_UNSUBACK:
       LOG_INFO("[ENV:SUCCESS] - Unsubbed from environment topic\n");
@@ -146,7 +157,8 @@ void set_temperature(char* buffer){
   srand(time(NULL));
   // random increment {-1, 0, 1}
   signed char rand_increment = (signed char)(rand() % 4);
-  rand_increment = (rand_increment == 2) ? -1 : rand_increment == 3 ? 2 : rand_increment;
+  // @TODO: remember to change 3 back to -1
+  rand_increment = (rand_increment == 2) ? 3 : rand_increment == 3 ? 2 : rand_increment;
 
   // @TODO: check actuation state
 
@@ -195,6 +207,13 @@ PROCESS_THREAD(environment_sensor, ev, data){
       }
 
       if(state == STATE_CONNECTED && etimer_expired(&publication_timer)){
+        if(!subbed){
+          char* topic = "actuators/env_state";
+          LOG_INFO("[ENV:INFO] - Subscribing to topic '%s'\n", topic);
+          uint8_t qos = MQTT_QOS_LEVEL_0;
+          mqtt_subscribe(&conn, NULL, topic, qos);
+          subbed = true;
+        }
 
         LOG_INFO("[ENV:INFO] - Publishing new message in %s topic\n", MQTT_TOPIC_NAME);
 

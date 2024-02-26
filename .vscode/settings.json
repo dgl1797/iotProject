@@ -1,3 +1,9 @@
 {
-  "java.configuration.updateBuildConfiguration": "interactive"
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "files.associations": {
+    "*.rmd": "markdown",
+    "*.json": "jsonc",
+    "*.m": "matlab",
+    "time.h": "c"
+  }
 }

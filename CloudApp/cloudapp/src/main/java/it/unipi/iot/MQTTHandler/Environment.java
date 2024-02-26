@@ -80,8 +80,9 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
     actualState = newState;
     String content = String.format("{\"ta\":\"%d\"}", newState);
     MqttMessage message = new MqttMessage(content.getBytes());
+    message.setQos(0);
     try {
-      mqttClient.publish(content, message);
+      mqttClient.publish("actuators/env_state", message);
       Logger.SUCCESS("env",
           String.format("Conditioner mode: %s, published correctly", getMode(newState)));
       return true;

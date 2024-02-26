@@ -66,7 +66,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     String content = String.format("{\"sv\":\"%d\",\"tv\":\"%d\"}", switchVal, tempVal);
     MqttMessage message = new MqttMessage(content.getBytes());
     try {
-      mqttClient.publish(content, message);
+      mqttClient.publish("actuators/mah_state", message);
       Logger.SUCCESS("mah",
           String.format("Switch state: %s; Cooler State: %s, published correctly", getSMode(switchVal),
               getTMode(tempVal)));
