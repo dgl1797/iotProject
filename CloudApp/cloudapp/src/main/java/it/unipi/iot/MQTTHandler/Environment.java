@@ -126,7 +126,7 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
       try {
         json = (JSONObject) JSONValue.parseWithException(msg);
         int temperature = ((Number) json.get("temperature")).intValue();
-        Logger.INFO("env", String.format("New data received: %d °C", temperature));
+        Logger.INFO("env", String.format("New data received: %d°C", temperature));
         environmentTemperatureController(temperature);
         EnvironmentData storedData = EnvironmentDAO.saveData(new EnvironmentData(temperature));
         if (storedData == null)
