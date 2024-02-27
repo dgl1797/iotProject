@@ -12,9 +12,13 @@
 #include <stdlib.h>
 #include <time.h>
 
+/*--------------------------MACROS-------------------------------*/
+#define GET_STATE_STRING(state_value) state_value == 0 ? "Off" : state_value == 1 ? "Medium" : "High"
+/*--------------------------MACROS END-------------------------------*/
+
 /*----------------------PROCESS SETUP-----------------------------------*/
-PROCESS(environment_sensor, "helloworld process");
-AUTOSTART_PROCESSES(&environment_sensor);
+PROCESS(machine_sensor, "machine sensor process");
+AUTOSTART_PROCESSES(&machine_sensor);
 /*----------------------PROCESS SETUP END-----------------------------------*/
 
 /*-----------------------LOG CONFIG----------------------------------*/
@@ -34,9 +38,12 @@ static const char *broker_ip = MQTT_CLIENT_BROKER_IP_ADDR;
 
 /*------------------------STATES CONFIG----------------------------------*/
 static uint8_t state;
+static bool subbed = false; // unsubbed
 static signed char temperature = 20; // starts from 20°C
 static signed char humidity = 30; // starts from 30% humidity
 static unsigned short int output = 0; // starts from 0 output produced
+static unsigned char switch_actuator_state = 0;  // ON
+static unsigned char temper_actuator_state = 0; // OFF
 
 #define STATE_INIT    		    0
 #define STATE_NET_OK    	    1
@@ -47,7 +54,7 @@ static unsigned short int output = 0; // starts from 0 output produced
 /*------------------------STATES CONFIG END----------------------------------*/
 
 /*------------------------BUFFERS SETUP-------------------------------------*/
-#define MAX_TCP_SEGMENT_SIZE      32
+#define MAX_TCP_SEGMENT_SIZE      64
 #define CONFIG_IP_ADDR_STR_LEN    64
 #define BUFFER_SIZE               64
 #define MAX_CAPACITY              50
@@ -56,6 +63,7 @@ static unsigned short int output = 0; // starts from 0 output produced
 static char client_id[BUFFER_SIZE];
 static char mdata_topic[BUFFER_SIZE];
 static char app_buffer[APP_BUFFER_SIZE];
+static char handler_buffer[MAX_TCP_SEGMENT_SIZE];
 /*------------------------BUFFERS SETUP END-------------------------------------*/
 
 /*------------------------TIMERS SETUP-----------------------------------*/
@@ -77,21 +85,73 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 /*------------------------MQTT MESSAGES SETUP END------------------------------*/
 
 /*------------------------MQTT EVENTS--------------------------------*/
+char* next_pair(uint8_t* start_index, char* json){
+  char *it;
+  bool is_key = true;
+  bool new_string = false;
+  char* start;
+  uint8_t index = 0;
+  for (it = json+(*start_index); *it != '\0'; it++){
+    if(!new_string){
+        // control phase
+        if(*it == '"'){
+            new_string = true;
+            if(is_key) start = it;
+        }else if(*it == ':'){
+            is_key = false;
+        }else if(*it == ',' || *it == '}'){
+            *it='\0';
+            is_key = true;
+            *start_index = index+1;
+            return start;
+        }
+    } else if(*it=='"') new_string = false;
+    index++;
+  }
+  return NULL;
+}
+
+char* extract_value(char* pair){
+  char *start;
+  char *it;
+  bool is_value = false;
+  bool new_string = false;
+  for (it = pair; *it != '\0'; it++){
+    if (!is_value && *it == ':') is_value = true;
+    else if (!new_string && is_value && *it == '\"'){
+      start = it+1;
+      new_string = true;
+    }else if (new_string && *it == '\"') *it = '\0';
+  }
+  return start;
+}
 
 static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
             uint16_t chunk_len){
-  
-  // handler if the mqtt needs to do some action on publish
 
-  /*printf("Pub Handler: topic='%s' (len=%u), chunk_len=%u\n", topic,
-          topic_len, chunk_len);*/
-/*
-  if(strcmp(topic, "actuator") == 0) {
-    printf("Received Actuator command\n");
-	printf("%s\n", chunk);
-    // Do something :)
-    return;
-  }*/
+  *handler_buffer = '\0';
+  memcpy(handler_buffer, (char *)chunk, strlen((char *)chunk));
+
+  if(strcmp(topic, "actuators/mah_state") == 0){
+    uint8_t start_index = 0;
+    char *pair = next_pair(&start_index, handler_buffer);
+    char *value = extract_value(pair);
+    // switch value
+    uint8_t new_switch_value = atoi(value);
+
+    pair = next_pair(&start_index, handler_buffer);
+    value = extract_value(pair);
+    // temperature value
+    uint8_t new_temper_value = atoi(value);
+
+    LOG_INFO("[MAH:STATE] - Recorded changes\nSWITCH:\t%s to %s;\nTEMPERATURE:\t%s to %s\n", 
+      GET_STATE_STRING(switch_actuator_state), GET_STATE_STRING(new_switch_value),
+      GET_STATE_STRING(temper_actuator_state), GET_STATE_STRING(new_temper_value)
+    );
+    switch_actuator_state = new_switch_value;
+    temper_actuator_state = new_temper_value;
+  }
+
 }
 
 static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, void *data){
@@ -103,7 +163,7 @@ static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, vo
     case MQTT_EVENT_DISCONNECTED:
       LOG_INFO("[MAH:FAIL] - MQTT Disconnect. Reason %u\n", *((mqtt_event_t *)data));
       state = STATE_DISCONNECTED;
-      process_poll(&environment_sensor);
+      process_poll(&machine_sensor);
       break;
     case MQTT_EVENT_PUBLISH:
       msg_ptr = data;
@@ -146,10 +206,10 @@ void clean_buffer(char *buffer){
 }
 void set_data(char* buffer){
   srand(time(NULL));
-  // random increment {0, 1, 2}
+  // OFF increases; MEDIUM increases slowly; HIGH decreases;
   signed char rand_tincrement = (signed char)((rand() % 3)+1);
   signed char rand_hincrement = ((signed char)(rand() % 11)) - ((signed char)5);
-  unsigned short int rand_oincrement = (unsigned short int)(rand() % 31);
+  unsigned short int rand_oincrement = (unsigned short int)(rand() % 51);
 
   // @TODO: check actuation state
 
@@ -164,7 +224,7 @@ void set_data(char* buffer){
 /*------------------------UTILITY FUNCTIONS END--------------------------------*/
 
 
-PROCESS_THREAD(environment_sensor, ev, data){
+PROCESS_THREAD(machine_sensor, ev, data){
   PROCESS_BEGIN();
   LOG_INFO("[MAH:INFO] - Node started\n");
   // Initialize the ClientID as MAC address
@@ -174,7 +234,7 @@ PROCESS_THREAD(environment_sensor, ev, data){
                      linkaddr_node_addr.u8[6], linkaddr_node_addr.u8[7]);
 
   // Broker registration and state initialization
-  mqtt_register(&conn, &environment_sensor, client_id, mqtt_event_handler, MAX_TCP_SEGMENT_SIZE);
+  mqtt_register(&conn, &machine_sensor, client_id, mqtt_event_handler, MAX_TCP_SEGMENT_SIZE);
   state=STATE_INIT;
 
   // Timers initialization
@@ -200,6 +260,13 @@ PROCESS_THREAD(environment_sensor, ev, data){
       }
 
       if(state == STATE_CONNECTED && etimer_expired(&publication_timer)){
+        if(!subbed){
+          char* topic = "actuators/mah_state";
+          LOG_INFO("[MAH:INFO] - Subscribing to topic '%s'\n", topic);
+          uint8_t qos = MQTT_QOS_LEVEL_0;
+          mqtt_subscribe(&conn, NULL, topic, qos);
+          subbed = true;
+        }
 
         LOG_INFO("[MAH:INFO] - Publishing new message in %s topic\n", MQTT_TOPIC_NAME);
 

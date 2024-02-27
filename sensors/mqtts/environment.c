@@ -13,11 +13,11 @@
 #include <time.h>
 
 /*--------------------------MACROS-------------------------------*/
-#define GET_STATE_STRING(state_value) state_value == 0 ? "OFF" : state_value == 1 ? "Heating" : "Cooling"
+#define GET_STATE_STRING(state_value) state_value == 0 ? "Off" : state_value == 1 ? "Heating" : "Cooling"
 /*--------------------------MACROS END-------------------------------*/
 
 /*----------------------PROCESS SETUP-----------------------------------*/
-PROCESS(environment_sensor, "helloworld process");
+PROCESS(environment_sensor, "environment sensor process");
 AUTOSTART_PROCESSES(&environment_sensor);
 /*----------------------PROCESS SETUP END-----------------------------------*/
 
@@ -39,8 +39,8 @@ static const char *broker_ip = MQTT_CLIENT_BROKER_IP_ADDR;
 /*------------------------STATES CONFIG----------------------------------*/
 static uint8_t state;
 static bool subbed = false; // unsubbed
-static signed char temperature = 30; // starts from 20°C
-static signed char actuator_state = 0; // OFF
+static signed char temperature = 20;
+static unsigned char actuator_state = 0; // OFF
 
 #define STATE_INIT    		    0
 #define STATE_NET_OK    	    1
@@ -51,7 +51,7 @@ static signed char actuator_state = 0; // OFF
 /*------------------------STATES CONFIG END----------------------------------*/
 
 /*------------------------BUFFERS SETUP-------------------------------------*/
-#define MAX_TCP_SEGMENT_SIZE      32
+#define MAX_TCP_SEGMENT_SIZE      64
 #define CONFIG_IP_ADDR_STR_LEN    64
 #define BUFFER_SIZE               64
 #define MAX_CAPACITY              50
@@ -60,6 +60,7 @@ static signed char actuator_state = 0; // OFF
 static char client_id[BUFFER_SIZE];
 static char tenv_topic[BUFFER_SIZE];
 static char app_buffer[APP_BUFFER_SIZE];
+static char handler_buffer[MAX_TCP_SEGMENT_SIZE];
 /*------------------------BUFFERS SETUP END-------------------------------------*/
 
 /*------------------------TIMERS SETUP-----------------------------------*/
@@ -81,26 +82,62 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 /*------------------------MQTT MESSAGES SETUP END------------------------------*/
 
 /*------------------------MQTT EVENTS--------------------------------*/
+char* next_pair(uint8_t* start_index, char* json){
+  char *it;
+  bool is_key = true;
+  bool new_string = false;
+  char* start;
+  uint8_t index = 0;
+  for (it = json+(*start_index); *it != '\0'; it++){
+    if(!new_string){
+        // control phase
+        if(*it == '"'){
+            new_string = true;
+            if(is_key) start = it;
+        }else if(*it == ':'){
+            is_key = false;
+        }else if(*it == ',' || *it == '}'){
+            *it='\0';
+            is_key = true;
+            *start_index = index+1;
+            return start;
+        }
+    } else if(*it=='"') new_string = false;
+    index++;
+  }
+  return NULL;
+}
+
+char* extract_value(char* pair){
+  char *start;
+  char *it;
+  bool is_value = false;
+  bool new_string = false;
+  for (it = pair; *it != '\0'; it++){
+    if (!is_value && *it == ':') is_value = true;
+    else if (!new_string && is_value && *it == '\"'){
+      start = it+1;
+      new_string = true;
+    }else if (new_string && *it == '\"') *it = '\0';
+  }
+  return start;
+}
+
 
 static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *chunk,
             uint16_t chunk_len){
-  
-  if(strcmp(topic, "actuators/env_state") == 0){
-    // Actuator changed its state
-    LOG_INFO("[ENV:INFO] - Received actuator change state: Actual -> '%s'; New -> '%s'\n", GET_STATE_STRING(actuator_state), chunk);
-    // JSON Parsing
-  }
-  // handler if the mqtt needs to do some action on publish
 
-  /*printf("Pub Handler: topic='%s' (len=%u), chunk_len=%u\n", topic,
-          topic_len, chunk_len);*/
-/*
-  if(strcmp(topic, "actuator") == 0) {
-    printf("Received Actuator command\n");
-	printf("%s\n", chunk);
-    // Do something :)
-    return;
-  }*/
+  *handler_buffer = '\0';
+  memcpy(handler_buffer, (char *)chunk, strlen((char *)chunk));
+
+  if(strcmp(topic, "actuators/env_state") == 0){
+    uint8_t start_index = 0;
+    char *pair = next_pair(&start_index, handler_buffer);
+    char *value = extract_value(pair);
+    uint8_t new_actuator_value = atoi(value);
+    LOG_INFO("[ENV:STATE] - Recorded a state change: %s to %s\n", GET_STATE_STRING(actuator_state), GET_STATE_STRING(new_actuator_value));
+    actuator_state = new_actuator_value;
+  }
 }
 
 static void mqtt_event_handler(struct mqtt_connection *m, mqtt_event_t event, void *data){
@@ -155,14 +192,22 @@ void clean_buffer(char *buffer){
 }
 void set_temperature(char* buffer){
   srand(time(NULL));
-  // random increment {-1, 0, 1}
-  signed char rand_increment = (signed char)(rand() % 4);
-  // @TODO: remember to change 3 back to -1
-  rand_increment = (rand_increment == 2) ? 3 : rand_increment == 3 ? 2 : rand_increment;
-
-  // @TODO: check actuation state
-
-  // temperature update
+  signed char rand_increment = (signed char)(rand() % 5);
+  switch (actuator_state){
+    case 0:
+      // OFF
+      rand_increment = rand_increment - 2;
+      break;
+    case 1:
+      // Heating -> left rand_increment as it is;
+      break;
+    case 2:
+      // Cooling -> rand_increment is removed instead of being added
+      rand_increment = -rand_increment;
+      break;
+    default:
+      break;
+  }
   temperature += rand_increment;
 
   // buffer update with JSON formatted string
@@ -173,6 +218,8 @@ void set_temperature(char* buffer){
 
 PROCESS_THREAD(environment_sensor, ev, data){
   PROCESS_BEGIN();
+  srand(time(NULL));
+  temperature = ((signed char)(rand() % 2) == 0) ? 5 : 35;
   LOG_INFO("[ENV:INFO] - Node started\n");
   // Initialize the ClientID as MAC address
   snprintf(client_id, BUFFER_SIZE, "%02x%02x%02x%02x%02x%02x",

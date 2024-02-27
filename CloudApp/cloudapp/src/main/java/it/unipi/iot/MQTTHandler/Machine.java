@@ -27,7 +27,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
                                                   * and a upperBound representing the negative extreme value (stopping
                                                   * machine)
                                                   */
-  final static int[] productionLevel = { 10, 20 }; /*
+  final static int[] productionLevel = { 10, 30 }; /*
                                                     * lowerBound, the machine is not productive and must be
                                                     * stopped, upperBound, the machine produces extremely more than
                                                     * expected and probabily wil produce bad paper
