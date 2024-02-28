@@ -13,7 +13,8 @@
 #include <time.h>
 
 /*--------------------------MACROS-------------------------------*/
-#define GET_STATE_STRING(state_value) state_value == 0 ? "Off" : state_value == 1 ? "Medium" : "High"
+#define GET_TSTATE_STRING(t_state_value) t_state_value == 0 ? "Off" : t_state_value == 1 ? "Medium" : "High"
+#define GET_SSTATE_STRING(s_state_value) s_state_value == 0 ? "On" : "Off"
 /*--------------------------MACROS END-------------------------------*/
 
 /*----------------------PROCESS SETUP-----------------------------------*/
@@ -130,7 +131,7 @@ static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *ch
             uint16_t chunk_len){
 
   *handler_buffer = '\0';
-  memcpy(handler_buffer, (char *)chunk, strlen((char *)chunk));
+  memcpy(handler_buffer, (char *)chunk, chunk_len);
 
   if(strcmp(topic, "actuators/mah_state") == 0){
     uint8_t start_index = 0;
@@ -144,9 +145,9 @@ static void pub_handler(const char *topic, uint16_t topic_len, const uint8_t *ch
     // temperature value
     uint8_t new_temper_value = atoi(value);
 
-    LOG_INFO("[MAH:STATE] - Recorded changes\nSWITCH:\t%s to %s;\nTEMPERATURE:\t%s to %s\n", 
-      GET_STATE_STRING(switch_actuator_state), GET_STATE_STRING(new_switch_value),
-      GET_STATE_STRING(temper_actuator_state), GET_STATE_STRING(new_temper_value)
+    LOG_INFO("[MAH:STATE] - Recorded changes - SWITCH: %s to %s; TEMPERATURE: %s to %s\n", 
+      GET_SSTATE_STRING(switch_actuator_state), GET_SSTATE_STRING(new_switch_value),
+      GET_TSTATE_STRING(temper_actuator_state), GET_TSTATE_STRING(new_temper_value)
     );
     switch_actuator_state = new_switch_value;
     temper_actuator_state = new_temper_value;
@@ -206,12 +207,26 @@ void clean_buffer(char *buffer){
 }
 void set_data(char* buffer){
   srand(time(NULL));
-  // OFF increases; MEDIUM increases slowly; HIGH decreases;
-  signed char rand_tincrement = (signed char)((rand() % 3)+1);
+  signed char rand_tincrement = (signed char)((rand() % 5)+1);
   signed char rand_hincrement = ((signed char)(rand() % 11)) - ((signed char)5);
   unsigned short int rand_oincrement = (unsigned short int)(rand() % 51);
 
-  // @TODO: check actuation state
+  switch (temper_actuator_state){
+    // case 0:
+    //   /* OFF => just increases so it keeps rand_tincrement invariate */
+    //   break;
+    case 1:
+      /* Medium => increases slowly */
+      rand_tincrement = (signed char)(rand() % 3);
+      break;
+    case 2:
+      /* High => decreases with a small chance of increasing */
+      rand_tincrement -= 4;
+      break;
+    
+    default:
+      break;
+  }
 
   // temperature update
   temperature += rand_tincrement;
@@ -268,16 +283,20 @@ PROCESS_THREAD(machine_sensor, ev, data){
           subbed = true;
         }
 
-        LOG_INFO("[MAH:INFO] - Publishing new message in %s topic\n", MQTT_TOPIC_NAME);
+        if(switch_actuator_state == 0){
+          LOG_INFO("[MAH:INFO] - Publishing new message in %s topic\n", MQTT_TOPIC_NAME);
 
-        sprintf(mdata_topic, "%s", MQTT_TOPIC_NAME);
+          sprintf(mdata_topic, "%s", MQTT_TOPIC_NAME);
 
-			  clean_buffer(app_buffer);
-        set_data(app_buffer);
+          clean_buffer(app_buffer);
+          set_data(app_buffer);
 
-        mqtt_publish(&conn, NULL, mdata_topic, (uint8_t *)app_buffer, strlen(app_buffer), 
-          MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF
-        );
+          mqtt_publish(&conn, NULL, mdata_topic, (uint8_t *)app_buffer, strlen(app_buffer), 
+            MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF
+          );
+        }else{
+          // led must blink indicating the machine is switched off due to a problem.
+        }
 
 		    // leds_on(LEDS_RED); ** TODO: Led di segnalazione se la temperatura è fuori dagli estremi
 
