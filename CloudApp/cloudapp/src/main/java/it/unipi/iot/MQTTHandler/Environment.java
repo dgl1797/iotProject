@@ -150,9 +150,11 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         if (temperature < tresholds[0]) {
           Logger.INFO("env", temperature + "°C => Switching to Heating mode");
           notifyActuation(1);
+          // post Heating command to CoAP node
         } else if (temperature > tresholds[1]) {
           Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
           notifyActuation(2);
+          // post Cooling command to CoAP node
         }
         break;
       case 1:
@@ -160,9 +162,11 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         if (temperature > tresholds[1]) {
           Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
           notifyActuation(2);
+          // post Cooling command to CoAP node
         } else if (temperature >= tresholds[0] + 10) {
           Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
           notifyActuation(0);
+          // post Off command to CoAP node
         }
         break;
       case 2:
@@ -170,9 +174,11 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         if (temperature < tresholds[0]) {
           Logger.INFO("env", temperature + "°C => Switching to Heating mode");
           notifyActuation(1);
+          // post Heating command to CoAP node
         } else if (temperature <= tresholds[1] - 10) {
           Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
           notifyActuation(0);
+          // post Off command to CoAP node
         }
         break;
       default:

@@ -3,6 +3,8 @@
 #include "sys/etimer.h"
 #include "coap-blocking-api.h"
 
+#define NODE_ID 1
+
 /* Log configuration */
 #include "sys/log.h"
 #define LOG_MODULE "App"
@@ -40,7 +42,7 @@ PROCESS_THREAD(environment_coap_node, ev, data)
   coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
 
   char payload[50];
-  sprintf(payload, "{\"id\":%d}", 1);
+  sprintf(payload, "{\"id\":%d}", NODE_ID);
   /* Prepare request */
   coap_init_message(&request, COAP_TYPE_CON, COAP_POST, 0);
   coap_set_header_uri_path(&request, SERVER_URI);

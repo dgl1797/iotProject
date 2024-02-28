@@ -180,36 +180,45 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         // no cooling
         if (temperature > tempTresh[2]) {
           resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+          // post s:off,t:off command to CoAP
         } else if (temperature > tempTresh[1]) {
           Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
           notifyActuation(0, 2);
+          // post s:old_s,t:high command to CoAP
         } else if (temperature > tempTresh[0]) {
           Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
           notifyActuation(0, 1);
+          // post s:old_s,t:medium command to CoAP
         }
         break;
       case 1:
         // soft cooling alredy enabled
         if (temperature > tempTresh[2]) {
           resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+          // post s:off,t:off command to CoAP
         } else if (temperature > tempTresh[1]) {
           Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
           notifyActuation(0, 2);
+          // post s:old_s,t:high command to CoAP
         } else if (temperature <= tempTresh[0] - 10) {
           Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
           notifyActuation(0, 0);
+          // post s:old_s,t:off command to CoAP
         }
         break;
       case 2:
         // hard cooling alredy enabled
         if (temperature > tempTresh[2]) {
           resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+          // post s:off,t:off command to CoAP
         } else if (temperature <= tempTresh[0] - 10) {
           Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
           notifyActuation(0, 2);
+          // post s:old_s,t:off command to CoAP
         } else if (temperature <= tempTresh[1] - 10) {
           Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
           notifyActuation(0, 0);
+          // post s:old_s,t:medium command to CoAP
         }
         break;
       default:
@@ -219,8 +228,10 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   }
 
   void machineProductionLevelController(int mean) {
-    if (mean < productionLevel[0] || mean > productionLevel[1])
+    if (mean < productionLevel[0] || mean > productionLevel[1]) {
+      // post Off command to CoAP Switch
       resetMachine("Problem occurred: production level anomaly detected: " + mean + " outputs/min");
+    }
   }
 
   void resetMachine(String message) {
