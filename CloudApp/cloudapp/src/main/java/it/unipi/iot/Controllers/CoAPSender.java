@@ -26,6 +26,7 @@ public class CoAPSender {
   }
 
   public void sendCommand(String resource, String command) {
+    Logger.INFO(getNodeName(), String.format("Sending Command to %s", ipv6));
     client.setURI(String.format("coap://[%s]%s", ipv6, resource));
     try {
       CoapResponse response = client.post(command, MediaTypeRegistry.TEXT_PLAIN);
