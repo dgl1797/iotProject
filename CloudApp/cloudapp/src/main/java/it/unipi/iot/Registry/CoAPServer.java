@@ -1,4 +1,4 @@
-package it.unipi.iot.CoAP;
+package it.unipi.iot.Registry;
 
 import org.eclipse.californium.core.CoapServer;
 

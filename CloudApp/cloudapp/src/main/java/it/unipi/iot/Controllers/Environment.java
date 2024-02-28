@@ -1,4 +1,4 @@
-package it.unipi.iot.MQTTHandler;
+package it.unipi.iot.Controllers;
 
 import org.eclipse.californium.elements.exception.ConnectorException;
 import org.eclipse.paho.client.mqttv3.*;
@@ -19,7 +19,9 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
   String brokerUrl;
   String clientId;
   String topic;
-  private MqttClient mqttClient;
+  private final MqttClient mqttClient;
+  private final CoAPSender coapSender;
+  private final int NODE_ID = 1;
   BlockingDeque<String> queue;
 
   int actualState = 0; // 0 = OFF; 1 = HEATING; 2 = COOLING
@@ -30,12 +32,15 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
     this.brokerUrl = brokerUrl;
     this.clientId = "environment";
     this.topic = "tenv";
+    /** MQTT Setup */
     mqttClient = new MqttClient(brokerUrl, clientId);
     this.queue = new LinkedBlockingDeque<>(5000);
     mqttClient.setCallback(this);
     mqttClient.connect();
     mqttClient.subscribe(topic);
     Logger.SUCCESS("env", "Connected to MQTT Broker. Subscribed to topic: " + topic);
+    /** CoAP Setup */
+    coapSender = new CoAPSender(NODE_ID);
   }
 
   @Override
@@ -151,10 +156,12 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
           Logger.INFO("env", temperature + "°C => Switching to Heating mode");
           notifyActuation(1);
           // post Heating command to CoAP node
+          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"1\"}");
         } else if (temperature > tresholds[1]) {
           Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
           notifyActuation(2);
           // post Cooling command to CoAP node
+          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"2\"}");
         }
         break;
       case 1:
@@ -163,10 +170,12 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
           Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
           notifyActuation(2);
           // post Cooling command to CoAP node
+          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"2\"}");
         } else if (temperature >= tresholds[0] + 10) {
           Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
           notifyActuation(0);
           // post Off command to CoAP node
+          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"0\"}");
         }
         break;
       case 2:
@@ -175,10 +184,12 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
           Logger.INFO("env", temperature + "°C => Switching to Heating mode");
           notifyActuation(1);
           // post Heating command to CoAP node
+          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"1\"}");
         } else if (temperature <= tresholds[1] - 10) {
           Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
           notifyActuation(0);
           // post Off command to CoAP node
+          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"0\"}");
         }
         break;
       default:
