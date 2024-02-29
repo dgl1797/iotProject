@@ -20,16 +20,57 @@
 #define LOG_MODULE "App"
 #define LOG_LEVEL LOG_LEVEL_APP
 
-PROCESS(environment_coap_node, "CoAP Environment");
-PROCESS(environment_coap_resources, "CoAP Resources");
-AUTOSTART_PROCESSES(&environment_coap_node, &environment_coap_resources);
+/*-----------------JSON HANDLING------------------------*/
+char* next_pair(uint8_t* start_index, char* json){
+  char *it;
+  bool is_key = true;
+  bool new_string = false;
+  char* start;
+  uint8_t index = 0;
+  for (it = json+(*start_index); *it != '\0'; it++){
+    if(!new_string){
+        // control phase
+        if(*it == '"'){
+            new_string = true;
+            if(is_key) start = it;
+        }else if(*it == ':'){
+            is_key = false;
+        }else if(*it == ',' || *it == '}'){
+            *it='\0';
+            is_key = true;
+            *start_index = index+1;
+            return start;
+        }
+    } else if(*it=='"') new_string = false;
+    index++;
+  }
+  return NULL;
+}
 
-/*------------------REGISTRATION PROCESS-------------------*/
+char* extract_value(char* pair){
+  char *start;
+  char *it;
+  bool is_value = false;
+  bool new_string = false;
+  for (it = pair; *it != '\0'; it++){
+    if (!is_value && *it == ':') is_value = true;
+    else if (!new_string && is_value && *it == '\"'){
+      start = it+1;
+      new_string = true;
+    }else if (new_string && *it == '\"') *it = '\0';
+  }
+  return start;
+}
+/*-----------------JSON HANDLING END------------------------*/
+
+/*------------------NODE PROCESS-------------------*/
 #define SERVER_EP "coap://[fd00::1]:5683"
 #define SERVER_URI "/register"
 #define RETRY_PERIOD 2*CLOCK_SECOND
 
 static bool registered = false;
+
+extern coap_resource_t res_environment_temperature;
 
 void response_handler(coap_message_t *response)
 {
@@ -41,16 +82,46 @@ void response_handler(coap_message_t *response)
   }
 
   int len = coap_get_payload(response, &chunk);
-  if(strcmp("{\"res\":\"success\"}", (char*)chunk) == 0){
+  if(len < 0){
+    LOG_INFO("[COAP:ENV] - Payload problem");
+    return;
+  }
+  char *message = malloc((len+1) * sizeof(char));
+  message[len] = '\0';
+  sprintf(message, "%.*s", len, (char *)chunk);
+  LOG_INFO("[COAP:ENV] - Message received: %s\n", message);
+  if(strcmp("{\"res\":\"success\"}", message) == 0){
     registered = true;
-    LOG_INFO("[COAP:ENV:SUCCESS] - Registration completed");
+    LOG_INFO("[COAP:ENV:SUCCESS] - Registration completed\n");
   }
 }
+
+static bool is_reachable(){
+  if(NETSTACK_ROUTING.node_is_reachable()) {
+		LOG_INFO("[COAP:ENV] - BR reachable\n");
+		return true;
+  	}
+
+	LOG_INFO("[COAP:ENV] - Waiting for connection with BR\n");
+	return false;
+}
+
+PROCESS(environment_coap_node, "CoAP Environment");
+AUTOSTART_PROCESSES(&environment_coap_node);
 
 PROCESS_THREAD(environment_coap_node, ev, data)
 {
   PROCESS_BEGIN();
 
+  // VERIFY CONNECTION
+  static struct etimer connectivity_timer;
+  etimer_set(&connectivity_timer, RETRY_PERIOD+10);
+  while(!is_reachable()){
+    PROCESS_WAIT_UNTIL(etimer_expired(&connectivity_timer));
+    etimer_reset(&connectivity_timer);
+  }
+
+  // REGISTER THE SERVICE AND THE RESOURCES
   static coap_endpoint_t server_ep;
   static coap_message_t request;
   static struct etimer retry_timer;
@@ -59,7 +130,6 @@ PROCESS_THREAD(environment_coap_node, ev, data)
 
   char payload[50];
   sprintf(payload, "{\"id\":%d}", NODE_ID);
-  etimer_set(&retry_timer, RETRY_PERIOD);
   while(!registered){
     LOG_INFO("[COAP:ENV] - Trying to register to CoAP");
     /* Prepare request */
@@ -69,18 +139,13 @@ PROCESS_THREAD(environment_coap_node, ev, data)
 
     /* Send request */
     COAP_BLOCKING_REQUEST(&server_ep, &request, response_handler);
+    etimer_set(&retry_timer, RETRY_PERIOD);
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&retry_timer));
-    etimer_reset(&retry_timer);
   }
 
-  PROCESS_END();
-}
-/*------------------REGISTRATION PROCESS END-------------------*/
+  // ACTIVATE RESOURCES
+  coap_activate_resource(&res_environment_temperature, "/environment/temp_act");
 
-/*-----------------------RESOURCES PROCESS-------------------------*/
-PROCESS_THREAD(environment_coap_resources, ev, data){
-  PROCESS_BEGIN();
-  LOG_INFO("[ENV:RES] - Hello");
   PROCESS_END();
 }
-/*-----------------------RESOURCES PROCESS END-------------------------*/
+/*------------------NODE PROCESS END-------------------*/

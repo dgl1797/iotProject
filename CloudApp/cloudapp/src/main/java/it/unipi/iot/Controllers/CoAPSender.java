@@ -25,19 +25,22 @@ public class CoAPSender {
     return this.nodeId == 1 ? "env" : "mah";
   }
 
-  public void sendCommand(String resource, String command) {
+  public boolean sendCommand(String resource, String command) {
     Logger.INFO(getNodeName(), String.format("Sending Command to %s", ipv6));
     client.setURI(String.format("coap://[%s]%s", ipv6, resource));
     try {
       CoapResponse response = client.post(command, MediaTypeRegistry.TEXT_PLAIN);
       if (response.isSuccess()) {
         Logger.SUCCESS(getNodeName(), String.format("Actuator responded with: %s", response));
+        return true;
       } else {
         Logger.ERROR(getNodeName(), String.format("Actuator responded with: %s", response));
+        return false;
       }
     } catch (ConnectorException | IOException e) {
       Logger.ERROR(getNodeName(), "Couldn't post command");
       e.printStackTrace();
+      return false;
     }
   }
 }

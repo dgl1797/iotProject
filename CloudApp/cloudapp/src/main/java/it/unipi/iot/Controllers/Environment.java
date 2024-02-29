@@ -153,43 +153,49 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
       case 0:
         // No Actuation
         if (temperature < tresholds[0]) {
-          Logger.INFO("env", temperature + "°C => Switching to Heating mode");
-          notifyActuation(1);
-          // post Heating command to CoAP node
-          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"1\"}");
+          if (coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"1\"}")) {
+            // post Heating command to CoAP node
+            Logger.INFO("env", temperature + "°C => Switching to Heating mode");
+            notifyActuation(1);
+          }
         } else if (temperature > tresholds[1]) {
-          Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
-          notifyActuation(2);
-          // post Cooling command to CoAP node
-          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"2\"}");
+          if (coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"2\"}")) {
+            // post Cooling command to CoAP node
+            Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
+            notifyActuation(2);
+          }
         }
         break;
       case 1:
         // Heating mode active
         if (temperature > tresholds[1]) {
-          Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
-          notifyActuation(2);
-          // post Cooling command to CoAP node
-          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"2\"}");
+          if (coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"2\"}")) {
+            // post Cooling command to CoAP node
+            Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
+            notifyActuation(2);
+          }
         } else if (temperature >= tresholds[0] + 10) {
-          Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
-          notifyActuation(0);
-          // post Off command to CoAP node
-          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"0\"}");
+          if (coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"0\"}")) {
+            // post Off command to CoAP node
+            Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
+            notifyActuation(0);
+          }
         }
         break;
       case 2:
         // Cooling mode active
         if (temperature < tresholds[0]) {
-          Logger.INFO("env", temperature + "°C => Switching to Heating mode");
-          notifyActuation(1);
-          // post Heating command to CoAP node
-          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"1\"}");
+          if (coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"1\"}")) {
+            // post Heating command to CoAP node
+            Logger.INFO("env", temperature + "°C => Switching to Heating mode");
+            notifyActuation(1);
+          }
         } else if (temperature <= tresholds[1] - 10) {
-          Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
-          notifyActuation(0);
-          // post Off command to CoAP node
-          coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"0\"}");
+          if (coapSender.sendCommand("/environment/temp_act", "{\"ta\":\"0\"}")) {
+            // post Off command to CoAP node
+            Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
+            notifyActuation(0);
+          }
         }
         break;
       default:

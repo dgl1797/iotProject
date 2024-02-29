@@ -60,7 +60,7 @@ public class RegistryDAO {
   }
 
   static public String getIPv6(int nodeId) {
-    final String query = String.format("SELECT ipv6 FROM &s WHERE id=%d", tableName, nodeId);
+    final String query = String.format("SELECT ipv6 FROM %s WHERE id=%d", tableName, nodeId);
     try {
       Connection conn = HikariPoolDataSource.getConnection();
       Statement stmt = conn.createStatement();
