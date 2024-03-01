@@ -28,7 +28,6 @@ public class App {
 
         // Server Setup
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
-        MainMenu menu = new MainMenu();
 
         // MQTTs
         Environment env = new Environment(SystemEnv.BROKER_URL);
@@ -38,6 +37,8 @@ public class App {
 
         // CoAP
         CoAPServer coapServer = new CoAPServer();
+
+        MainMenu menu = new MainMenu(env, mah);
 
         // threads
         Thread envThread = new Thread(env);

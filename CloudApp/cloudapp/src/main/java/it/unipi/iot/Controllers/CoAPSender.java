@@ -25,11 +25,9 @@ public class CoAPSender {
   }
 
   public boolean sendCommand(String command) {
-    Logger.INFO(getNodeName(), String.format("Sending Command to %s", client.getURI()));
     try {
       CoapResponse response = client.post(command, MediaTypeRegistry.TEXT_PLAIN);
       if (response.isSuccess()) {
-        Logger.SUCCESS(getNodeName(), String.format("Actuator responded with: %s", response));
         return true;
       } else {
         Logger.ERROR(getNodeName(), String.format("Actuator responded with: %s", response));

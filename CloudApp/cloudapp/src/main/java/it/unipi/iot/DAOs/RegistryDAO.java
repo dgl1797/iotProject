@@ -29,7 +29,6 @@ public class RegistryDAO {
   }
 
   static public boolean registerNode(int id, String ipv6) {
-    Logger.INFO("coap", String.format("Received new registration request: %d - %s", id, ipv6));
     final String nodeExists = String.format("SELECT * FROM %s WHERE id=%d", tableName, id);
     final String insertNode = String.format("INSERT INTO %s (id, ipv6) VALUES (%d, \"%s\")", tableName, id, ipv6);
     final String updateNode = String.format("UPDATE %s SET ipv6=\"%s\" WHERE id=%d", tableName, ipv6, id);

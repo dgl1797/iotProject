@@ -16,24 +16,21 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
 public class Environment implements MqttCallback, IMqttMessageListener, Runnable {
-  String brokerUrl;
-  String clientId;
-  String topic;
+  private String topic;
   private final MqttClient mqttClient;
   private final CoAPSender envTempSender;
   private final int NODE_ID = 1;
-  BlockingDeque<String> queue;
+  private BlockingDeque<String> queue;
 
-  int actualState = 0; // 0 = OFF; 1 = HEATING; 2 = COOLING
-  final static int[] tresholds = { 10, 30 }; // below or higher is activated until 20 is reached again
+  private boolean stateForced = false;
+  private int actualState = 0; // 0 = OFF; 1 = HEATING; 2 = COOLING
+  private final static int[] tresholds = { 10, 30 }; // below or higher is activated until 20 is reached again
 
   public Environment(String brokerUrl)
       throws MqttException, ConnectorException, IOException, SQLException {
-    this.brokerUrl = brokerUrl;
-    this.clientId = "environment";
     this.topic = "tenv";
     /** MQTT Setup */
-    mqttClient = new MqttClient(brokerUrl, clientId);
+    mqttClient = new MqttClient(brokerUrl, "environment");
     this.queue = new LinkedBlockingDeque<>(5000);
     mqttClient.setCallback(this);
     mqttClient.connect();
@@ -89,7 +86,7 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
     try {
       mqttClient.publish("actuators/env_state", message);
       Logger.SUCCESS("env",
-          String.format("Conditioner mode: %s, published correctly", getMode(newState)));
+          String.format("Conditioner mode changed: %s", getMode(newState)));
       return true;
     } catch (MqttException e) {
       Logger.ERROR("env", "Error during publishing phase");
@@ -133,17 +130,44 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         json = (JSONObject) JSONValue.parseWithException(msg);
         int temperature = ((Number) json.get("temperature")).intValue();
         Logger.INFO("env", String.format("New data received: %d°C", temperature));
-        environmentTemperatureController(temperature);
+        if (!stateForced)
+          environmentTemperatureController(temperature);
         EnvironmentData storedData = EnvironmentDAO.saveData(new EnvironmentData(temperature));
         if (storedData == null)
           throw new SQLException("Failed to store data");
-        Logger.SUCCESS("env", String.format("stored data: %s", storedData));
       } catch (ParseException e) {
         Logger.ERROR("env", "Error during parsing JSON Message");
         e.printStackTrace(System.err);
       } catch (SQLException e) {
         Logger.ERROR("env", "Failed to store data");
       }
+    }
+  }
+
+  private int getState(String mode) {
+    mode = mode.toLowerCase();
+    return mode.equals("off") ? 0 : mode.equals("heating") ? 1 : mode.equals("cooling") ? 2 : -1;
+  }
+
+  public void releaseState() {
+    Logger.SUCCESS("env", "Environment actuation released");
+    this.stateForced = false;
+  }
+
+  public boolean forceState(String newMode) {
+    this.stateForced = true;
+    int newState = getState(newMode);
+    if (newState == -1) {
+      Logger.ERROR("env", "Failed to force conditioner's state");
+      return false;
+    }
+    if (envTempSender.sendCommand(String.format("{\"ta\":\"%d\"}", newState))) {
+      Logger.INFO("env", String.format("Forcing Conditioner to %s mode", newMode));
+      notifyActuation(newState);
+      return true;
+    } else {
+      Logger.ERROR("env", "Failed to force conditioner's state");
+      return false;
     }
   }
 
@@ -155,13 +179,11 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         if (temperature < tresholds[0]) {
           if (envTempSender.sendCommand("{\"ta\":\"1\"}")) {
             // post Heating command to CoAP node
-            Logger.INFO("env", temperature + "°C => Switching to Heating mode");
             notifyActuation(1);
           }
         } else if (temperature > tresholds[1]) {
           if (envTempSender.sendCommand("{\"ta\":\"2\"}")) {
             // post Cooling command to CoAP node
-            Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
             notifyActuation(2);
           }
         }
@@ -171,13 +193,11 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         if (temperature > tresholds[1]) {
           if (envTempSender.sendCommand("{\"ta\":\"2\"}")) {
             // post Cooling command to CoAP node
-            Logger.INFO("env", temperature + "°C => Switching to Cooling mode");
             notifyActuation(2);
           }
         } else if (temperature >= tresholds[0] + 10) {
           if (envTempSender.sendCommand("{\"ta\":\"0\"}")) {
             // post Off command to CoAP node
-            Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
             notifyActuation(0);
           }
         }
@@ -187,13 +207,11 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         if (temperature < tresholds[0]) {
           if (envTempSender.sendCommand("{\"ta\":\"1\"}")) {
             // post Heating command to CoAP node
-            Logger.INFO("env", temperature + "°C => Switching to Heating mode");
             notifyActuation(1);
           }
         } else if (temperature <= tresholds[1] - 10) {
           if (envTempSender.sendCommand("{\"ta\":\"0\"}")) {
             // post Off command to CoAP node
-            Logger.INFO("env", temperature + "°C => Switching Conditioner Off");
             notifyActuation(0);
           }
         }

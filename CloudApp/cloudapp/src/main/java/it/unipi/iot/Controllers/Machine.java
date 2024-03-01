@@ -38,6 +38,9 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   int[] ac_Ac_State = { 0, 0 };
   LinkedList<Integer> productionHistory = new LinkedList<>();
 
+  private boolean forcedSwitch = false;
+  private boolean forcedCooler = false;
+
   public Machine(String brokerUrl)
       throws MqttException, ConnectorException, IOException, SQLException {
     this.brokerUrl = brokerUrl;
@@ -73,7 +76,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     try {
       mqttClient.publish("actuators/mah_state", message);
       Logger.SUCCESS("mah",
-          String.format("Switch state: %s; Cooler State: %s, published correctly", getSMode(switchVal),
+          String.format("State changed: Switch -> %s; Cooler -> %s", getSMode(switchVal),
               getTMode(tempVal)));
       return true;
     } catch (MqttException e) {
@@ -154,7 +157,8 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         int temperature = ((Number) json.get("temperature")).intValue();
         int humidity = ((Number) json.get("humidity")).intValue();
         int outputs = ((Number) json.get("outputs")).intValue();
-        Logger.INFO("mah", String.format("New data received: %d; %d; %d", temperature, humidity, outputs));
+        Logger.INFO("mah",
+            String.format("New data received: %d°C; %d%c; %d o/min", temperature, humidity, '%', outputs));
         if (productionHistory.size() > 3)
           productionHistory.removeFirst();
         productionHistory.addLast(outputs);
@@ -167,7 +171,6 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         MachineData returnedData = MachineDAO.saveData(new MachineData(temperature, humidity, outputs));
         if (returnedData == null)
           throw new SQLException("Failed to store data");
-        Logger.SUCCESS("mah", String.format("stored data: %s", returnedData));
       } catch (ParseException e) {
         Logger.ERROR("mah", "Error during parsing JSON Message");
         e.printStackTrace(System.err);
@@ -177,69 +180,117 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     }
   }
 
+  public void releaseSwitch() {
+    Logger.SUCCESS("mah", "Switch actuation released");
+    forcedSwitch = false;
+  }
+
+  private int getState(String mode) {
+    return mode.equals("off") ? 1 : mode.equals("on") ? 0 : -1;
+  }
+
+  public boolean forceSwitchState(String newMode) {
+    forcedSwitch = true;
+    int newState = getState(newMode);
+    if (newState == -1) {
+      Logger.ERROR("mah", "Invalid mode");
+      return false;
+    }
+    if (switchSender.sendCommand(String.format("{\"sa\":\"%d\"}", newState))) {
+      if (newState == 0) {
+        Logger.SUCCESS("mah", "Forced Machine Boot");
+        notifyActuation(0, ac_Ac_State[0]);
+      } else {
+        resetMachine("Forced shutdown");
+      }
+      return true;
+    }
+    Logger.ERROR("mah", "Failed to force switch state");
+    return false;
+  }
+
+  public void releaseCooler() {
+    Logger.SUCCESS("mah", "Cooler actuation released");
+    forcedCooler = false;
+  }
+
+  private int getCState(String mode) {
+    return mode.equals("off") ? 0 : mode.equals("medium") ? 1 : mode.equals("high") ? 2 : -1;
+  }
+
+  public boolean forceCoolerState(String newMode) {
+    forcedCooler = true;
+    int newState = getCState(newMode);
+    if (newState == -1) {
+      Logger.ERROR("mah", "Invalid mode");
+      return false;
+    }
+    if (tempSender.sendCommand(String.format("{\"ta\":\"%d\"}", newState))) {
+      Logger.INFO("mah", String.format("Forcing Cooler to %s mode", newMode));
+      notifyActuation(ac_Ac_State[1], newState);
+      return true;
+    }
+    Logger.ERROR("mah", "Failed to force cooler state");
+    return false;
+  }
+
   // controller functions
   boolean machineTemperatureController(int temperature) {
     boolean ret = false;
     switch (ac_Ac_State[0]) {
       case 0:
         // no cooling
-        if (temperature > tempTresh[2]) {
+        if (temperature > tempTresh[2] && !forcedSwitch) {
           if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
-        } else if (temperature > tempTresh[1]) {
+        } else if (temperature > tempTresh[1] && !forcedCooler) {
           if (tempSender.sendCommand("{\"ta\":\"2\"}")) {
             // post s:old_s,t:high command to CoAP
-            Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 2);
           }
-        } else if (temperature > tempTresh[0]) {
+        } else if (temperature > tempTresh[0] && !forcedCooler) {
           if (tempSender.sendCommand("{\"ta\":\"1\"}")) {
             // post s:old_s,t:medium command to CoAP
-            Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 1);
           }
         }
         break;
       case 1:
         // soft cooling alredy enabled
-        if (temperature > tempTresh[2]) {
+        if (temperature > tempTresh[2] && !forcedSwitch) {
           if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
-        } else if (temperature > tempTresh[1]) {
+        } else if (temperature > tempTresh[1] && !forcedCooler) {
           if (tempSender.sendCommand("{\"ta\":\"2\"}")) {
             // post s:old_s,t:high command to CoAP
-            Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 2);
           }
-        } else if (temperature <= tempTresh[0] - 10) {
+        } else if ((temperature <= tempTresh[0] - 10) && !forcedCooler) {
           if (tempSender.sendCommand("{\"ta\":\"0\"}")) {
             // post s:old_s,t:off command to CoAP
-            Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
             notifyActuation(0, 0);
           }
         }
         break;
       case 2:
         // hard cooling alredy enabled
-        if (temperature > tempTresh[2]) {
+        if (temperature > tempTresh[2] && !forcedSwitch) {
           if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
-        } else if (temperature <= tempTresh[0] - 10) {
+        } else if ((temperature <= tempTresh[0] - 10) && !forcedCooler) {
           if (tempSender.sendCommand("{\"ta\":\"0\"}")) {
             // post s:old_s,t:off command to CoAP
-            Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
             notifyActuation(0, 0);
           }
-        } else if (temperature <= tempTresh[1] - 10) {
+        } else if ((temperature <= tempTresh[1] - 10) && !forcedCooler) {
           if (tempSender.sendCommand("{\"ta\":\"1\"}")) {
             // post s:old_s,t:medium command to CoAP
-            Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 1);
           }
         }
@@ -251,7 +302,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   }
 
   void machineProductionLevelController(int mean) {
-    if (mean < productionLevel[0] || mean > productionLevel[1]) {
+    if ((mean < productionLevel[0] || mean > productionLevel[1]) && !forcedSwitch) {
       // post Off command to CoAP Switch
       if (switchSender.sendCommand("{\"sa\":\"1\"}"))
         resetMachine("Problem occurred: production level anomaly detected: " + mean + " outputs/min");
