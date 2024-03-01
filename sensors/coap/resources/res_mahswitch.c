@@ -9,7 +9,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "light controller"
+#define LOG_MODULE "machine switch"
 #define LOG_LEVEL LOG_LEVEL_APP
 
 #define GET_SSTATE_STRING(s_state_value) s_state_value == 0 ? "Off" : "On"

@@ -17,7 +17,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "App"
+#define LOG_MODULE "Machine Coap Server"
 #define LOG_LEVEL LOG_LEVEL_APP
 
 /*-----------------JSON HANDLING------------------------*/
@@ -116,7 +116,7 @@ PROCESS_THREAD(machine_coap_node, ev, data)
 
   // VERIFY CONNECTION
   static struct etimer connectivity_timer;
-  etimer_set(&connectivity_timer, RETRY_PERIOD+10);
+  etimer_set(&connectivity_timer, RETRY_PERIOD*5);
   while(!is_reachable()){
     PROCESS_WAIT_UNTIL(etimer_expired(&connectivity_timer));
     etimer_reset(&connectivity_timer);
@@ -144,8 +144,8 @@ PROCESS_THREAD(machine_coap_node, ev, data)
   }
 
   // ACTIVATE RESOURCES
-  coap_activate_resource(&res_machine_switch, "/machine/switch_act");
-  coap_activate_resource(&res_machine_temperature, "/machine/temp_act");
+  coap_activate_resource(&res_machine_switch, "machine/switch_act");
+  coap_activate_resource(&res_machine_temperature, "machine/temp_act");
 
   PROCESS_END();
 }

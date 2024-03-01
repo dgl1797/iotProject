@@ -23,7 +23,7 @@ AUTOSTART_PROCESSES(&machine_sensor);
 /*----------------------PROCESS SETUP END-----------------------------------*/
 
 /*-----------------------LOG CONFIG----------------------------------*/
-#define LOG_MODULE "Env_Temperature_Logs"
+#define LOG_MODULE "Machine Sensor"
 #define LOG_LEVEL LOG_LEVEL_APP
 /*-----------------------LOG CONFIG END----------------------------------*/
 

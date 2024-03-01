@@ -9,7 +9,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "light controller"
+#define LOG_MODULE "environment temperature"
 #define LOG_LEVEL LOG_LEVEL_APP
 
 #define GET_STATE_STRING(state_value) state_value == 0 ? "Off" : state_value == 1 ? "Heating" : "Cooling"

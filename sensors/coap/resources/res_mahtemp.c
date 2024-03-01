@@ -9,7 +9,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "light controller"
+#define LOG_MODULE "machine temperature"
 #define LOG_LEVEL LOG_LEVEL_APP
 
 #define GET_TSTATE_STRING(t_state_value) t_state_value == 0 ? "Off" : t_state_value == 1 ? "Medium" : "High"

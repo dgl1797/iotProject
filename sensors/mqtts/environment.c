@@ -22,7 +22,7 @@ AUTOSTART_PROCESSES(&environment_sensor);
 /*----------------------PROCESS SETUP END-----------------------------------*/
 
 /*-----------------------LOG CONFIG----------------------------------*/
-#define LOG_MODULE "Env_Temperature_Logs"
+#define LOG_MODULE "Environment Sensor"
 #define LOG_LEVEL LOG_LEVEL_APP
 /*-----------------------LOG CONFIG END----------------------------------*/
 

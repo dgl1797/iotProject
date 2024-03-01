@@ -12,22 +12,20 @@ import it.unipi.iot.Utils.Logger;
 
 public class CoAPSender {
   private CoapClient client;
-  private String ipv6;
   private int nodeId;
 
-  public CoAPSender(int nodeId) {
+  public CoAPSender(int nodeId, String... res) {
     this.nodeId = nodeId;
-    ipv6 = RegistryDAO.getIPv6(nodeId);
-    client = new CoapClient();
+    String ipv6 = RegistryDAO.getIPv6(nodeId);
+    client = new CoapClient(String.format("coap://[%s]/%s", ipv6, String.join("/", res)));
   }
 
   private String getNodeName() {
     return this.nodeId == 1 ? "env" : "mah";
   }
 
-  public boolean sendCommand(String resource, String command) {
-    Logger.INFO(getNodeName(), String.format("Sending Command to %s", ipv6));
-    client.setURI(String.format("coap://[%s]%s", ipv6, resource));
+  public boolean sendCommand(String command) {
+    Logger.INFO(getNodeName(), String.format("Sending Command to %s", client.getURI()));
     try {
       CoapResponse response = client.post(command, MediaTypeRegistry.TEXT_PLAIN);
       if (response.isSuccess()) {

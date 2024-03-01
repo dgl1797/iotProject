@@ -21,7 +21,8 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   String clientId;
   String topic;
   private MqttClient mqttClient;
-  private final CoAPSender coapSender;
+  private final CoAPSender switchSender;
+  private final CoAPSender tempSender;
   private final int NODE_ID = 2;
   BlockingDeque<String> queue;
   final static int[] tempTresh = { 49, 59, 89 }; /*
@@ -48,7 +49,8 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     mqttClient.connect();
     mqttClient.subscribe(topic);
     Logger.SUCCESS("mah", "Connected to MQTT Broker. Subscribed to topic: " + topic);
-    coapSender = new CoAPSender(NODE_ID);
+    switchSender = new CoAPSender(NODE_ID, "machine", "switch_act");
+    tempSender = new CoAPSender(NODE_ID, "machine", "temp_act");
   }
 
   private String getTMode(int tval) {
@@ -182,18 +184,18 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       case 0:
         // no cooling
         if (temperature > tempTresh[2]) {
-          if (coapSender.sendCommand("/machine/switch_act", "{\"sa\":\"1\"}")) {
+          if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if (temperature > tempTresh[1]) {
-          if (coapSender.sendCommand("/machine/temp_act", "{\"ta\":\"2\"}")) {
+          if (tempSender.sendCommand("{\"ta\":\"2\"}")) {
             // post s:old_s,t:high command to CoAP
             Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 2);
           }
         } else if (temperature > tempTresh[0]) {
-          if (coapSender.sendCommand("/machine/temp_act", "{\"ta\":\"1\"}")) {
+          if (tempSender.sendCommand("{\"ta\":\"1\"}")) {
             // post s:old_s,t:medium command to CoAP
             Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 1);
@@ -203,18 +205,18 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       case 1:
         // soft cooling alredy enabled
         if (temperature > tempTresh[2]) {
-          if (coapSender.sendCommand("/machine/switch_act", "{\"sa\":\"1\"}")) {
+          if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if (temperature > tempTresh[1]) {
-          if (coapSender.sendCommand("/machine/temp_act", "{\"ta\":\"2\"}")) {
+          if (tempSender.sendCommand("{\"ta\":\"2\"}")) {
             // post s:old_s,t:high command to CoAP
             Logger.INFO("mah", "Switching to High Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 2);
           }
         } else if (temperature <= tempTresh[0] - 10) {
-          if (coapSender.sendCommand("/machine/temp_act", "{\"ta\":\"0\"}")) {
+          if (tempSender.sendCommand("{\"ta\":\"0\"}")) {
             // post s:old_s,t:off command to CoAP
             Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
             notifyActuation(0, 0);
@@ -224,18 +226,18 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       case 2:
         // hard cooling alredy enabled
         if (temperature > tempTresh[2]) {
-          if (coapSender.sendCommand("/machine/switch_act", "{\"sa\":\"1\"}")) {
+          if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if (temperature <= tempTresh[0] - 10) {
-          if (coapSender.sendCommand("/machine/temp_act", "{\"ta\":\"0\"}")) {
+          if (tempSender.sendCommand("{\"ta\":\"0\"}")) {
             // post s:old_s,t:off command to CoAP
             Logger.INFO("mah", "Shutting down Cooling: " + temperature + "°C");
             notifyActuation(0, 0);
           }
         } else if (temperature <= tempTresh[1] - 10) {
-          if (coapSender.sendCommand("/machine/temp_act", "{\"ta\":\"1\"}")) {
+          if (tempSender.sendCommand("{\"ta\":\"1\"}")) {
             // post s:old_s,t:medium command to CoAP
             Logger.INFO("mah", "Switching to Medium Cooling Mode: " + temperature + "°C");
             notifyActuation(0, 1);
@@ -251,7 +253,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   void machineProductionLevelController(int mean) {
     if (mean < productionLevel[0] || mean > productionLevel[1]) {
       // post Off command to CoAP Switch
-      if (coapSender.sendCommand("/machine/switch_act", "{\"sa\":\"1\"}"))
+      if (switchSender.sendCommand("{\"sa\":\"1\"}"))
         resetMachine("Problem occurred: production level anomaly detected: " + mean + " outputs/min");
     }
   }

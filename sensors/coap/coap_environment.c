@@ -17,7 +17,7 @@
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "App"
+#define LOG_MODULE "Environment Coap Server"
 #define LOG_LEVEL LOG_LEVEL_APP
 
 /*-----------------JSON HANDLING------------------------*/
@@ -115,7 +115,7 @@ PROCESS_THREAD(environment_coap_node, ev, data)
 
   // VERIFY CONNECTION
   static struct etimer connectivity_timer;
-  etimer_set(&connectivity_timer, RETRY_PERIOD+10);
+  etimer_set(&connectivity_timer, RETRY_PERIOD*5);
   while(!is_reachable()){
     PROCESS_WAIT_UNTIL(etimer_expired(&connectivity_timer));
     etimer_reset(&connectivity_timer);
@@ -131,7 +131,7 @@ PROCESS_THREAD(environment_coap_node, ev, data)
   char payload[50];
   sprintf(payload, "{\"id\":%d}", NODE_ID);
   while(!registered){
-    LOG_INFO("[COAP:ENV] - Trying to register to CoAP");
+    LOG_INFO("[COAP:ENV] - Trying to register to CoAP\n");
     /* Prepare request */
     coap_init_message(&request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(&request, SERVER_URI);
@@ -144,7 +144,7 @@ PROCESS_THREAD(environment_coap_node, ev, data)
   }
 
   // ACTIVATE RESOURCES
-  coap_activate_resource(&res_environment_temperature, "/environment/temp_act");
+  coap_activate_resource(&res_environment_temperature, "environment/temp_act");
 
   PROCESS_END();
 }

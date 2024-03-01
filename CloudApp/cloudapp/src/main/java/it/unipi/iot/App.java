@@ -6,6 +6,7 @@ import it.unipi.iot.Controllers.Machine;
 import it.unipi.iot.DAOs.EnvironmentDAO;
 import it.unipi.iot.DAOs.MachineDAO;
 import it.unipi.iot.DAOs.RegistryDAO;
+import it.unipi.iot.GUI.MainMenu;
 import it.unipi.iot.Registry.CoAPServer;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ public class App {
 
         // Server Setup
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        MainMenu menu = new MainMenu();
 
         // MQTTs
         Environment env = new Environment(SystemEnv.BROKER_URL);
@@ -39,12 +41,15 @@ public class App {
 
         // threads
         Thread envThread = new Thread(env);
-        envThread.start();
-
         Thread mahThread = new Thread(mah);
-        mahThread.start();
-
         Thread servThread = new Thread(coapServer);
+        Thread menuThread = new Thread(menu);
+
+        // run
+        menuThread.start();
+        envThread.start();
+        mahThread.start();
         servThread.start();
+
     }
 }
