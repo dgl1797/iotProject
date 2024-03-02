@@ -13,6 +13,15 @@
 #define LOG_LEVEL LOG_LEVEL_APP
 
 #define GET_STATE_STRING(state_value) state_value == 0 ? "Off" : state_value == 1 ? "Heating" : "Cooling"
+char *next_pair(uint8_t *start_index, char *json);
+char *extract_value(char *pair);
+
+/* LEDS */
+#define LG 1 // 001 
+#define LY 2 // 010
+#define LR 4 // 100
+
+static uint8_t current_state = 0;
 
 static void res_post_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
@@ -24,6 +33,13 @@ RESOURCE(res_environment_temperature,
          NULL,
          NULL);
 
+static void handle_state_change(uint8_t state){
+  current_state = state;
+  leds_toggle(leds_get());
+  if(state == 1) leds_toggle(LY);
+  else if (state == 2) leds_toggle(LG);
+}
+
 static void 
 res_post_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset){
   // Check for valid request and response pointers
@@ -33,7 +49,7 @@ res_post_handler(coap_message_t *request, coap_message_t *response, uint8_t *buf
   }
 
   // Extract CoAP payload
-  const uint8_t *chunk;
+  const uint8_t *chunk = NULL;
   uint16_t payload_len = coap_get_payload(request, &chunk);
 
   if(payload_len < 0){
@@ -46,7 +62,11 @@ res_post_handler(coap_message_t *request, coap_message_t *response, uint8_t *buf
   sprintf(payload, "%.*s", payload_len, (char *)chunk);
 
   // Process the extracted payload here
-  LOG_INFO("[COAP:ENV:TEMP] - Received command: %s\n", payload);
+  uint8_t starting_index = 0;
+  char *np = next_pair(&starting_index, payload);
+  uint8_t commanded_state = atoi(extract_value(np));
+  LOG_INFO("[COAP:ENV:TEMP] - Received command: %s\n", GET_STATE_STRING(commanded_state));
+  handle_state_change(commanded_state);
 
   // Set appropriate response
   coap_set_status_code(response, CONTENT_2_05);

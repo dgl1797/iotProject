@@ -7,6 +7,7 @@
 #include "net/ipv6/uip-icmp6.h"
 #include "net/ipv6/sicslowpan.h"
 #include "os/sys/log.h"
+#include "os/dev/leds.h"
 #include "lib/sensors.h"
 #include "coap-blocking-api.h"
 #include <stdio.h>
@@ -14,6 +15,11 @@
 #include <time.h>
 
 #define NODE_ID 2
+
+/* LEDS */
+#define LG 1 // 001 
+#define LY 2 // 010
+#define LR 4 // 100
 
 /* Log configuration */
 #include "sys/log.h"
