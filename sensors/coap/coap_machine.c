@@ -31,7 +31,7 @@ char* next_pair(uint8_t* start_index, char* json){
   char *it = NULL;
   bool is_key = true;
   bool new_string = false;
-  char* start;
+  char* start = NULL;
   uint8_t index = 0;
   for (it = json+(*start_index); *it != '\0'; it++){
     if(!new_string){
