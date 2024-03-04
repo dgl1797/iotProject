@@ -28,7 +28,7 @@
 
 /*-----------------JSON HANDLING------------------------*/
 char* next_pair(uint8_t* start_index, char* json){
-  char *it;
+  char *it = NULL;
   bool is_key = true;
   bool new_string = false;
   char* start;
@@ -54,8 +54,8 @@ char* next_pair(uint8_t* start_index, char* json){
 }
 
 char* extract_value(char* pair){
-  char *start;
-  char *it;
+  char *start = NULL;
+  char *it = NULL;
   bool is_value = false;
   bool new_string = false;
   for (it = pair; *it != '\0'; it++){
@@ -81,7 +81,7 @@ extern coap_resource_t res_machine_switch,
 
 void response_handler(coap_message_t *response)
 {
-  const uint8_t *chunk;
+  const uint8_t *chunk = NULL;
 
   if(response == NULL) {
     LOG_INFO("Request timed out\n");
