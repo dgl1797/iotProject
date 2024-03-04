@@ -1,6 +1,7 @@
 package it.unipi.iot.Controllers;
 
 import java.io.IOException;
+import java.sql.SQLException;
 
 import org.eclipse.californium.core.CoapClient;
 import org.eclipse.californium.core.CoapResponse;
@@ -10,31 +11,28 @@ import org.eclipse.californium.elements.exception.ConnectorException;
 import it.unipi.iot.DAOs.RegistryDAO;
 import it.unipi.iot.Utils.Logger;
 
-public class CoAPSender {
-  private CoapClient client;
-  private int nodeId;
+public final class CoAPSender {
 
-  public CoAPSender(int nodeId, String... res) {
-    this.nodeId = nodeId;
-    String ipv6 = RegistryDAO.getIPv6(nodeId);
-    client = new CoapClient(String.format("coap://[%s]/%s", ipv6, String.join("/", res)));
+  private static String getNodeName(int nodeId) {
+    return nodeId == 1 ? "env" : "mah";
   }
 
-  private String getNodeName() {
-    return this.nodeId == 1 ? "env" : "mah";
-  }
-
-  public boolean sendCommand(String command) {
+  public static boolean sendCommand(String command, int nodeId, String res) {
     try {
+      final String ipv6 = RegistryDAO.getIPv6(nodeId);
+      if (ipv6 == null)
+        throw new SQLException("ipv6 not registered");
+      CoapClient client = new CoapClient(String.format("coap://[%s]/%s", ipv6, res));
+
       CoapResponse response = client.post(command, MediaTypeRegistry.TEXT_PLAIN);
       if (response.isSuccess()) {
         return true;
       } else {
-        Logger.ERROR(getNodeName(), String.format("Actuator responded with: %s", response));
+        Logger.ERROR(getNodeName(nodeId), String.format("Actuator responded with: %s", response));
         return false;
       }
-    } catch (ConnectorException | IOException e) {
-      Logger.ERROR(getNodeName(), "Couldn't post command");
+    } catch (ConnectorException | IOException | SQLException e) {
+      Logger.ERROR(getNodeName(nodeId), "Couldn't post command");
       e.printStackTrace();
       return false;
     }

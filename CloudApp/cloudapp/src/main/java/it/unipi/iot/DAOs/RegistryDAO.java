@@ -32,10 +32,9 @@ public class RegistryDAO {
     final String nodeExists = String.format("SELECT * FROM %s WHERE id=%d", tableName, id);
     final String insertNode = String.format("INSERT INTO %s (id, ipv6) VALUES (%d, \"%s\")", tableName, id, ipv6);
     final String updateNode = String.format("UPDATE %s SET ipv6=\"%s\" WHERE id=%d", tableName, ipv6, id);
-    try {
 
+    try (Connection conn = HikariPoolDataSource.getConnection()) {
       // CHECK IF EXISTS
-      Connection conn = HikariPoolDataSource.getConnection();
       Statement stmt = conn.createStatement();
       ResultSet resset = stmt.executeQuery(nodeExists);
       if (!resset.next()) {
@@ -60,8 +59,7 @@ public class RegistryDAO {
 
   static public String getIPv6(int nodeId) {
     final String query = String.format("SELECT ipv6 FROM %s WHERE id=%d", tableName, nodeId);
-    try {
-      Connection conn = HikariPoolDataSource.getConnection();
+    try (Connection conn = HikariPoolDataSource.getConnection()) {
       Statement stmt = conn.createStatement();
       ResultSet rset = stmt.executeQuery(query);
       if (!rset.next())

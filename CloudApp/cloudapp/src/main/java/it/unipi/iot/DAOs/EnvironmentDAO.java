@@ -13,13 +13,12 @@ public class EnvironmentDAO {
   static final String tableName = "environment_data";
 
   static public void createTable() {
-    try {
+    try (Connection conn = HikariPoolDataSource.getConnection()) {
       final String query = String.format(
           "CREATE TABLE IF NOT EXISTS %s(id INT AUTO_INCREMENT, temperature INT NOT NULL, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id));",
           tableName);
 
       Logger.INFO("cloud", String.format("Creating table %s", tableName));
-      Connection conn = HikariPoolDataSource.getConnection();
       Statement stmt = conn.createStatement();
       stmt.execute(query);
       Logger.SUCCESS("cloud", String.format("%s creation Completed", tableName));
@@ -30,11 +29,10 @@ public class EnvironmentDAO {
   }
 
   static public EnvironmentData saveData(EnvironmentData newData) {
-    try {
+    try (Connection conn = HikariPoolDataSource.getConnection()) {
       final String query = String.format("INSERT INTO %s (temperature) VALUES (%d);",
           tableName, newData.getTemperature());
 
-      Connection conn = HikariPoolDataSource.getConnection();
       Statement stmt = conn.createStatement();
       int affectedRows = stmt.executeUpdate(query, Statement.RETURN_GENERATED_KEYS);
       if (affectedRows != 1)

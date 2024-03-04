@@ -21,8 +21,6 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   String clientId;
   String topic;
   private MqttClient mqttClient;
-  private final CoAPSender switchSender;
-  private final CoAPSender tempSender;
   private final int NODE_ID = 2;
   BlockingDeque<String> queue;
   final static int[] tempTresh = { 49, 59, 89 }; /*
@@ -41,6 +39,9 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   private boolean forcedSwitch = false;
   private boolean forcedCooler = false;
 
+  private final String SWITCH_RESOURCE = "machine/switch_act";
+  private final String TEMP_RESOURCE = "machine/temp_act";
+
   public Machine(String brokerUrl)
       throws MqttException, ConnectorException, IOException, SQLException {
     this.brokerUrl = brokerUrl;
@@ -52,8 +53,6 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     mqttClient.connect();
     mqttClient.subscribe(topic);
     Logger.SUCCESS("mah", "Connected to MQTT Broker. Subscribed to topic: " + topic);
-    switchSender = new CoAPSender(NODE_ID, "machine", "switch_act");
-    tempSender = new CoAPSender(NODE_ID, "machine", "temp_act");
   }
 
   private String getTMode(int tval) {
@@ -196,7 +195,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       Logger.ERROR("mah", "Invalid mode");
       return false;
     }
-    if (switchSender.sendCommand(String.format("{\"sa\":\"%d\"}", newState))) {
+    if (CoAPSender.sendCommand(String.format("{\"sa\":\"%d\"}", newState), NODE_ID, SWITCH_RESOURCE)) {
       if (newState == 0) {
         Logger.SUCCESS("mah", "Forced Machine Boot");
         notifyActuation(0, ac_Ac_State[0]);
@@ -225,7 +224,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       Logger.ERROR("mah", "Invalid mode");
       return false;
     }
-    if (tempSender.sendCommand(String.format("{\"ta\":\"%d\"}", newState))) {
+    if (CoAPSender.sendCommand(String.format("{\"ta\":\"%d\"}", newState), NODE_ID, TEMP_RESOURCE)) {
       Logger.INFO("mah", String.format("Forcing Cooler to %s mode", newMode));
       notifyActuation(ac_Ac_State[1], newState);
       return true;
@@ -241,17 +240,17 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       case 0:
         // no cooling
         if (temperature > tempTresh[2] && !forcedSwitch) {
-          if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
+          if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE)) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if (temperature > tempTresh[1] && !forcedCooler) {
-          if (tempSender.sendCommand("{\"ta\":\"2\"}")) {
+          if (CoAPSender.sendCommand("{\"ta\":\"2\"}", NODE_ID, TEMP_RESOURCE)) {
             // post s:old_s,t:high command to CoAP
             notifyActuation(0, 2);
           }
         } else if (temperature > tempTresh[0] && !forcedCooler) {
-          if (tempSender.sendCommand("{\"ta\":\"1\"}")) {
+          if (CoAPSender.sendCommand("{\"ta\":\"1\"}", NODE_ID, TEMP_RESOURCE)) {
             // post s:old_s,t:medium command to CoAP
             notifyActuation(0, 1);
           }
@@ -260,17 +259,17 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       case 1:
         // soft cooling alredy enabled
         if (temperature > tempTresh[2] && !forcedSwitch) {
-          if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
+          if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE)) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if (temperature > tempTresh[1] && !forcedCooler) {
-          if (tempSender.sendCommand("{\"ta\":\"2\"}")) {
+          if (CoAPSender.sendCommand("{\"ta\":\"2\"}", NODE_ID, TEMP_RESOURCE)) {
             // post s:old_s,t:high command to CoAP
             notifyActuation(0, 2);
           }
         } else if ((temperature <= tempTresh[0] - 10) && !forcedCooler) {
-          if (tempSender.sendCommand("{\"ta\":\"0\"}")) {
+          if (CoAPSender.sendCommand("{\"ta\":\"0\"}", NODE_ID, TEMP_RESOURCE)) {
             // post s:old_s,t:off command to CoAP
             notifyActuation(0, 0);
           }
@@ -279,17 +278,17 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       case 2:
         // hard cooling alredy enabled
         if (temperature > tempTresh[2] && !forcedSwitch) {
-          if (switchSender.sendCommand("{\"sa\":\"1\"}")) {
+          if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE)) {
             // post s:off,t:off command to CoAP
             resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if ((temperature <= tempTresh[0] - 10) && !forcedCooler) {
-          if (tempSender.sendCommand("{\"ta\":\"0\"}")) {
+          if (CoAPSender.sendCommand("{\"ta\":\"0\"}", NODE_ID, TEMP_RESOURCE)) {
             // post s:old_s,t:off command to CoAP
             notifyActuation(0, 0);
           }
         } else if ((temperature <= tempTresh[1] - 10) && !forcedCooler) {
-          if (tempSender.sendCommand("{\"ta\":\"1\"}")) {
+          if (CoAPSender.sendCommand("{\"ta\":\"1\"}", NODE_ID, TEMP_RESOURCE)) {
             // post s:old_s,t:medium command to CoAP
             notifyActuation(0, 1);
           }
@@ -304,7 +303,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   void machineProductionLevelController(int mean) {
     if ((mean < productionLevel[0] || mean > productionLevel[1]) && !forcedSwitch) {
       // post Off command to CoAP Switch
-      if (switchSender.sendCommand("{\"sa\":\"1\"}"))
+      if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE))
         resetMachine("Problem occurred: production level anomaly detected: " + mean + " outputs/min");
     }
   }
