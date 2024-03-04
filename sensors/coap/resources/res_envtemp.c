@@ -17,9 +17,11 @@ char *next_pair(uint8_t *start_index, char *json);
 char *extract_value(char *pair);
 
 /* LEDS */
-#define LG 1 // 001 
-#define LY 2 // 010
-#define LR 4 // 100
+#define LG 4
+#define LR 2
+#define LC 12
+#define LB 8
+#define LP 10
 
 static uint8_t current_state = 0;
 
@@ -35,9 +37,9 @@ RESOURCE(res_environment_temperature,
 
 static void handle_state_change(uint8_t state){
   current_state = state;
-  leds_toggle(leds_get());
-  if(state == 1) leds_toggle(LY);
-  else if (state == 2) leds_toggle(LG);
+  leds_off(leds_get());
+  if(state == 1) leds_on(LP);
+  else if (state == 2) leds_on(LB);
 }
 
 static void 

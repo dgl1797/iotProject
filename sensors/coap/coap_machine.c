@@ -17,9 +17,11 @@
 #define NODE_ID 2
 
 /* LEDS */
-#define LG 1 // 001 
-#define LY 2 // 010
-#define LR 4 // 100
+#define LG 4
+#define LR 2
+#define LC 12
+#define LB 8
+#define LP 10
 
 /* Log configuration */
 #include "sys/log.h"

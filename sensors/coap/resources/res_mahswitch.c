@@ -20,10 +20,11 @@ char *extract_value(char *pair);
 static uint8_t current_state = 0;
 
 /* LEDS */
-#define LG 1 // 001 
-#define LY 2 // 010
-#define LR 4 // 100
-#define BLINK_PERIOD 2000
+#define LG 4
+#define LR 2
+#define LC 12
+#define LB 8
+#define LP 10
 
 static void res_post_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
@@ -37,8 +38,8 @@ RESOURCE(res_machine_switch,
 
 static void handle_state_change(uint8_t state){
   current_state = state;
-  leds_toggle(leds_get());
-  if (state == 1) leds_toggle(LG | LY);
+  leds_off(leds_get());
+  if (state == 1) leds_on(LR);
 }
 
 static void 
