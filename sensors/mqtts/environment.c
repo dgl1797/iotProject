@@ -83,10 +83,10 @@ char broker_address[CONFIG_IP_ADDR_STR_LEN];
 
 /*------------------------MQTT EVENTS--------------------------------*/
 char* next_pair(uint8_t* start_index, char* json){
-  char *it;
+  char *it = NULL;
   bool is_key = true;
   bool new_string = false;
-  char* start;
+  char* start = NULL;
   uint8_t index = 0;
   for (it = json+(*start_index); *it != '\0'; it++){
     if(!new_string){
@@ -109,8 +109,8 @@ char* next_pair(uint8_t* start_index, char* json){
 }
 
 char* extract_value(char* pair){
-  char *start;
-  char *it;
+  char *start = NULL;
+  char *it = NULL;
   bool is_value = false;
   bool new_string = false;
   for (it = pair; *it != '\0'; it++){
