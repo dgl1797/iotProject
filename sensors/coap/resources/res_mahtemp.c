@@ -50,7 +50,7 @@ res_post_handler(coap_message_t *request, coap_message_t *response, uint8_t *buf
   }
 
   // Extract CoAP payload
-  const uint8_t *chunk;
+  const uint8_t *chunk = NULL;
   uint16_t payload_len = coap_get_payload(request, &chunk);
 
   if(payload_len < 0){
