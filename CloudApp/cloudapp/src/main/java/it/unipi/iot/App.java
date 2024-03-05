@@ -37,6 +37,7 @@ public class App {
 
         // CoAP
         CoAPServer coapServer = new CoAPServer();
+        coapServer.setResources(env, mah);
 
         MainMenu menu = new MainMenu(env, mah);
 

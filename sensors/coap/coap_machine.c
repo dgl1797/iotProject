@@ -10,6 +10,8 @@
 #include "os/dev/leds.h"
 #include "lib/sensors.h"
 #include "coap-blocking-api.h"
+#include "dev/button-hal.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -74,12 +76,28 @@ char* extract_value(char* pair){
 /*-----------------------NODE PROCESS-----------------------*/
 #define SERVER_EP "coap://[fd00::1]:5683"
 #define SERVER_URI "/register"
+#define SERVER_BURI "/machine/button"
 #define RETRY_PERIOD 2*CLOCK_SECOND
 
 static bool registered = false;
 
 extern coap_resource_t res_machine_switch,
                        res_machine_temperature;
+
+
+void button_response_handler(coap_message_t *response){
+  const uint8_t *chunk = NULL;
+  int len = coap_get_payload(response, &chunk);
+  if(response == NULL || len < 0){
+    LOG_INFO("[COAP:MAH] - Error during mode switch, state remains invariate\n");
+  }else{
+    char *message = malloc((len+1) * sizeof(char));
+    sprintf(message, "%.*s", len, (char *)chunk);
+    message[len] = '\0';
+    LOG_INFO("[COAP:MAH] - Message received: %s\n", message);
+
+  }
+}
 
 void response_handler(coap_message_t *response)
 {
@@ -92,7 +110,7 @@ void response_handler(coap_message_t *response)
 
   int len = coap_get_payload(response, &chunk);
   if(len < 0){
-    LOG_INFO("[COAP:ENV] - Payload problem");
+    LOG_INFO("[COAP:MAH] - Payload problem\n");
     return;
   }
   char *message = malloc((len+1) * sizeof(char));
@@ -154,6 +172,35 @@ PROCESS_THREAD(machine_coap_node, ev, data)
   // ACTIVATE RESOURCES
   coap_activate_resource(&res_machine_switch, "machine/switch_act");
   coap_activate_resource(&res_machine_temperature, "machine/temp_act");
+
+  // KEEP LISTENING FOR BUTTON PRESSURE
+  static uint8_t dt = 0;
+  while(1){
+    PROCESS_YIELD();
+    if (ev == button_hal_press_event){
+      dt = 0;
+    }else if(ev == button_hal_periodic_event){
+      dt++;
+    }else if(ev == button_hal_release_event){
+      if(dt >= 3){
+        sprintf(payload, "{\"type\":\"reset\"}");
+        coap_init_message(&request, COAP_TYPE_CON, COAP_POST, 0);
+        coap_set_header_uri_path(&request, SERVER_BURI);
+        coap_set_payload(&request, payload, strlen(payload));
+
+        /* Send request */
+        COAP_BLOCKING_REQUEST(&server_ep, &request, button_response_handler);
+      }else{
+        sprintf(payload, "{\"type\":\"mode_switch\"}");
+        coap_init_message(&request, COAP_TYPE_CON, COAP_POST, 0);
+        coap_set_header_uri_path(&request, SERVER_BURI);
+        coap_set_payload(&request, payload, strlen(payload));
+
+        /* Send request */
+        COAP_BLOCKING_REQUEST(&server_ep, &request, button_response_handler);
+      }
+    }
+  }
 
   PROCESS_END();
 }

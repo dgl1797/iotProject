@@ -1,5 +1,9 @@
 package it.unipi.iot.Controllers;
 
+import org.eclipse.californium.core.CoapResource;
+import org.eclipse.californium.core.coap.CoAP;
+import org.eclipse.californium.core.coap.Response;
+import org.eclipse.californium.core.server.resources.CoapExchange;
 import org.eclipse.californium.elements.exception.ConnectorException;
 import org.eclipse.paho.client.mqttv3.*;
 import org.json.simple.JSONObject;
@@ -11,12 +15,13 @@ import it.unipi.iot.Models.MachineData;
 import it.unipi.iot.Utils.Logger;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
-public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
+public class Machine extends CoapResource implements MqttCallback, IMqttMessageListener, Runnable {
   String brokerUrl;
   String clientId;
   String topic;
@@ -44,6 +49,9 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
 
   public Machine(String brokerUrl)
       throws MqttException, ConnectorException, IOException, SQLException {
+
+    super("machine/button");
+    setObservable(false);
     this.brokerUrl = brokerUrl;
     this.clientId = "machine";
     this.topic = "mdata";
@@ -185,6 +193,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   }
 
   private int getState(String mode) {
+    mode = mode.toLowerCase();
     return mode.equals("off") ? 1 : mode.equals("on") ? 0 : -1;
   }
 
@@ -214,6 +223,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   }
 
   private int getCState(String mode) {
+    mode = mode.toLowerCase();
     return mode.equals("off") ? 0 : mode.equals("medium") ? 1 : mode.equals("high") ? 2 : -1;
   }
 
@@ -316,5 +326,27 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     ac_Ac_State[0] = 0;
     ac_Ac_State[1] = 0;
     productionHistory.clear();
+  }
+
+  public void handlePOST(CoapExchange exchange) {
+    final String msg = exchange.getRequestText();
+    try {
+      final JSONObject json = (JSONObject) JSONValue.parseWithException(msg);
+      String mode = json.get("type").toString();
+      if (mode.toLowerCase().equals("reset")) {
+        forceSwitchState(getSMode((ac_Ac_State[1] + 1) % 2));
+      } else if (mode.toLowerCase().equals("mode_switch")) {
+        forceCoolerState(getTMode((ac_Ac_State[0] + 1) % 3));
+      } else {
+        throw new Throwable("Invalid type");
+      }
+      Response response = new Response(CoAP.ResponseCode.CONTENT);
+      response.setPayload("{\"res\":\"success\"}");
+      exchange.respond(response);
+    } catch (Throwable e) {
+      Logger.ERROR("coap", "Failed to parse message");
+      e.printStackTrace();
+      exchange.respond(CoAP.ResponseCode.NOT_ACCEPTABLE, "Failed".getBytes(StandardCharsets.UTF_8));
+    }
   }
 }

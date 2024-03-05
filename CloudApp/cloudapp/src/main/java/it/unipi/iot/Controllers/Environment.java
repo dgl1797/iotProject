@@ -1,5 +1,9 @@
 package it.unipi.iot.Controllers;
 
+import org.eclipse.californium.core.CoapResource;
+import org.eclipse.californium.core.coap.CoAP;
+import org.eclipse.californium.core.coap.Response;
+import org.eclipse.californium.core.server.resources.CoapExchange;
 import org.eclipse.californium.elements.exception.ConnectorException;
 import org.eclipse.paho.client.mqttv3.*;
 import org.json.simple.JSONObject;
@@ -11,11 +15,12 @@ import it.unipi.iot.Models.EnvironmentData;
 import it.unipi.iot.Utils.Logger;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
-public class Environment implements MqttCallback, IMqttMessageListener, Runnable {
+public class Environment extends CoapResource implements MqttCallback, IMqttMessageListener, Runnable {
   private String topic;
   private final MqttClient mqttClient;
   private final int NODE_ID = 1;
@@ -28,6 +33,9 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
 
   public Environment(String brokerUrl)
       throws MqttException, ConnectorException, IOException, SQLException {
+
+    super("environment/button");
+    setObservable(false);
     this.topic = "tenv";
     /** MQTT Setup */
     mqttClient = new MqttClient(brokerUrl, "environment");
@@ -216,6 +224,20 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         break;
       default:
         break;
+    }
+  }
+
+  public void handlePOST(CoapExchange exchange) {
+    try {
+      if (!forceState(getMode((actualState + 1) % 3)))
+        throw new Throwable("Couldn't force state");
+      Response response = new Response(CoAP.ResponseCode.CONTENT);
+      response.setPayload("{\"res\":\"success\"}");
+      exchange.respond(response);
+    } catch (Throwable e) {
+      Logger.ERROR("coap", "Failed to parse message");
+      e.printStackTrace();
+      exchange.respond(CoAP.ResponseCode.NOT_ACCEPTABLE, "Failed".getBytes(StandardCharsets.UTF_8));
     }
   }
 }
