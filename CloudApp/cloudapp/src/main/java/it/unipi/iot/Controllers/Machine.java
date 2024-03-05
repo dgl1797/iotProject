@@ -106,13 +106,11 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       try {
         mqttClient.connect();
         Logger.SUCCESS("mah", "MQTT Reconnetted");
-
       } catch (MqttException e) {
         Logger.ERROR("mah", "Error in connection to MQTT Broker\n");
         e.printStackTrace(System.err);
         e.getMessage();
       }
-
       try {
         mqttClient.subscribe(topic);
         Logger.SUCCESS("mah", "Connected to MQTT Broker. Subscribed to topic: " + topic);
@@ -121,7 +119,6 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         e.printStackTrace(System.err);
         e.getMessage();
       }
-
     }
   }
 
@@ -202,11 +199,10 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
       return false;
     }
     if (CoAPSender.sendCommand(String.format("{\"sa\":\"%d\"}", newState), NODE_ID, SWITCH_RESOURCE)) {
-      if (newState == 0) {
-        Logger.SUCCESS("mah", "Forced Machine Boot");
-        notifyActuation(0, ac_Ac_State[0]);
-      } else {
-        resetMachine("Forced shutdown");
+      if ((newState == 0) && (ac_Ac_State[1] == 1)) {
+        resetMachine("Forced Machine Boot");
+      } else if ((newState == 1) && (ac_Ac_State[1] == 0)) {
+        shutdownMachine("Forced shutdown");
       }
       return true;
     }
@@ -251,7 +247,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         if (temperature > tempTresh[2] && !forcedSwitch) {
           if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE)) {
             // post s:off,t:off command to CoAP
-            resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+            shutdownMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if (temperature > tempTresh[1] && !forcedCooler) {
           if (CoAPSender.sendCommand("{\"ta\":\"2\"}", NODE_ID, TEMP_RESOURCE)) {
@@ -270,7 +266,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         if (temperature > tempTresh[2] && !forcedSwitch) {
           if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE)) {
             // post s:off,t:off command to CoAP
-            resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+            shutdownMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if (temperature > tempTresh[1] && !forcedCooler) {
           if (CoAPSender.sendCommand("{\"ta\":\"2\"}", NODE_ID, TEMP_RESOURCE)) {
@@ -289,7 +285,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         if (temperature > tempTresh[2] && !forcedSwitch) {
           if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE)) {
             // post s:off,t:off command to CoAP
-            resetMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
+            shutdownMachine("Problem occurred: Critical Temperature Reached: " + temperature + "°C");
           }
         } else if ((temperature <= tempTresh[0] - 10) && !forcedCooler) {
           if (CoAPSender.sendCommand("{\"ta\":\"0\"}", NODE_ID, TEMP_RESOURCE)) {
@@ -313,18 +309,19 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
     if ((mean < productionLevel[0] || mean > productionLevel[1]) && !forcedSwitch) {
       // post Off command to CoAP Switch
       if (CoAPSender.sendCommand("{\"sa\":\"1\"}", NODE_ID, SWITCH_RESOURCE))
-        resetMachine("Problem occurred: production level anomaly detected: " + mean + " outputs/min");
+        shutdownMachine("Problem occurred: production level anomaly detected: " + mean + " outputs/min");
     }
   }
 
   void resetMachine(String message) {
+    productionHistory.clear();
+    Logger.SUCCESS("mah", message);
+    notifyActuation(0, 0);
+  }
+
+  void shutdownMachine(String message) {
     Logger.ERROR("mah", message);
     notifyActuation(1, 0);
-
-    // reset phase
-    ac_Ac_State[0] = 0;
-    ac_Ac_State[1] = 0;
-    productionHistory.clear();
   }
 
   public void handlePOST(CoapExchange exchange) {

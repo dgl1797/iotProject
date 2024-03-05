@@ -98,7 +98,7 @@ void button_response_handler(coap_message_t *response){
     if(strcmp("{\"res\":\"success\"}", message) == 0){
       LOG_INFO("[COAP:MAH:SUCCESS] - Mode Changed\n");
     } else{
-      LOG_INFO("[COAP:MAH:FAIL] - Mode Unchanged\n")
+      LOG_INFO("[COAP:MAH:FAIL] - Mode Unchanged\n");
     }
 
   }
