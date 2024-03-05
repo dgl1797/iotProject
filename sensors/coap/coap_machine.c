@@ -76,7 +76,7 @@ char* extract_value(char* pair){
 /*-----------------------NODE PROCESS-----------------------*/
 #define SERVER_EP "coap://[fd00::1]:5683"
 #define SERVER_URI "/register"
-#define SERVER_BURI "/machine/button"
+#define SERVER_BURI "/mahbutton"
 #define RETRY_PERIOD 2*CLOCK_SECOND
 
 static bool registered = false;
@@ -95,6 +95,11 @@ void button_response_handler(coap_message_t *response){
     sprintf(message, "%.*s", len, (char *)chunk);
     message[len] = '\0';
     LOG_INFO("[COAP:MAH] - Message received: %s\n", message);
+    if(strcmp("{\"res\":\"success\"}", message) == 0){
+      LOG_INFO("[COAP:MAH:SUCCESS] - Mode Changed\n");
+    } else{
+      LOG_INFO("[COAP:MAH:FAIL] - Mode Unchanged\n")
+    }
 
   }
 }

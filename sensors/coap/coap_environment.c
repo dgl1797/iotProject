@@ -76,7 +76,7 @@ char* extract_value(char* pair){
 /*------------------NODE PROCESS-------------------*/
 #define SERVER_EP "coap://[fd00::1]:5683"
 #define SERVER_URI "/register"
-#define SERVER_BURI "/environment/button"
+#define SERVER_BURI "/envbutton"
 #define RETRY_PERIOD 2*CLOCK_SECOND
 
 static bool registered = false;
@@ -95,6 +95,8 @@ void button_response_handler(coap_message_t *response){
     LOG_INFO("[COAP:ENV] - Message received: %s\n", message);
     if(strcmp("{\"res\":\"success\"}", message) == 0){
       LOG_INFO("[COAP:ENV:SUCCESS] - Mode Changed\n");
+    } else{
+      LOG_INFO("[COAP:ENV:FAIL] - Mode Unchanged\n")
     }
   }
 }

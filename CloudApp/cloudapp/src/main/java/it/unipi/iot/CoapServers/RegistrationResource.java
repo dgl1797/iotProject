@@ -1,4 +1,4 @@
-package it.unipi.iot.Registry;
+package it.unipi.iot.CoapServers;
 
 import java.nio.charset.StandardCharsets;
 

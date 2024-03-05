@@ -1,5 +1,6 @@
 package it.unipi.iot;
 
+import it.unipi.iot.CoapServers.CoAPServer;
 import it.unipi.iot.Config.SystemEnv;
 import it.unipi.iot.Controllers.Environment;
 import it.unipi.iot.Controllers.Machine;
@@ -7,7 +8,6 @@ import it.unipi.iot.DAOs.EnvironmentDAO;
 import it.unipi.iot.DAOs.MachineDAO;
 import it.unipi.iot.DAOs.RegistryDAO;
 import it.unipi.iot.GUI.MainMenu;
-import it.unipi.iot.Registry.CoAPServer;
 
 import java.io.IOException;
 import java.sql.SQLException;

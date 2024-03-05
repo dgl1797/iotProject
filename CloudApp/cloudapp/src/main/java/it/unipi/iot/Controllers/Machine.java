@@ -1,6 +1,5 @@
 package it.unipi.iot.Controllers;
 
-import org.eclipse.californium.core.CoapResource;
 import org.eclipse.californium.core.coap.CoAP;
 import org.eclipse.californium.core.coap.Response;
 import org.eclipse.californium.core.server.resources.CoapExchange;
@@ -21,7 +20,7 @@ import java.util.LinkedList;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
-public class Machine extends CoapResource implements MqttCallback, IMqttMessageListener, Runnable {
+public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
   String brokerUrl;
   String clientId;
   String topic;
@@ -50,8 +49,6 @@ public class Machine extends CoapResource implements MqttCallback, IMqttMessageL
   public Machine(String brokerUrl)
       throws MqttException, ConnectorException, IOException, SQLException {
 
-    super("machine/button");
-    setObservable(false);
     this.brokerUrl = brokerUrl;
     this.clientId = "machine";
     this.topic = "mdata";
@@ -228,6 +225,8 @@ public class Machine extends CoapResource implements MqttCallback, IMqttMessageL
   }
 
   public boolean forceCoolerState(String newMode) {
+    if (ac_Ac_State[1] == 1)
+      return false;
     forcedCooler = true;
     int newState = getCState(newMode);
     if (newState == -1) {

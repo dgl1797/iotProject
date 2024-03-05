@@ -1,6 +1,5 @@
 package it.unipi.iot.Controllers;
 
-import org.eclipse.californium.core.CoapResource;
 import org.eclipse.californium.core.coap.CoAP;
 import org.eclipse.californium.core.coap.Response;
 import org.eclipse.californium.core.server.resources.CoapExchange;
@@ -20,7 +19,7 @@ import java.sql.SQLException;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
-public class Environment extends CoapResource implements MqttCallback, IMqttMessageListener, Runnable {
+public class Environment implements MqttCallback, IMqttMessageListener, Runnable {
   private String topic;
   private final MqttClient mqttClient;
   private final int NODE_ID = 1;
@@ -34,8 +33,6 @@ public class Environment extends CoapResource implements MqttCallback, IMqttMess
   public Environment(String brokerUrl)
       throws MqttException, ConnectorException, IOException, SQLException {
 
-    super("environment/button");
-    setObservable(false);
     this.topic = "tenv";
     /** MQTT Setup */
     mqttClient = new MqttClient(brokerUrl, "environment");
