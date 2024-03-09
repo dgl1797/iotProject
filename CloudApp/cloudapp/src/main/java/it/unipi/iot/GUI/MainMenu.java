@@ -21,7 +21,7 @@ public class MainMenu implements Runnable {
       "- econditioner:<state> -> forces the conditioner actuator to passed state [off; heating; cooling]\n" +
       "- mswitch:<state> -> forces the machine switch to passed state [on; off]\n" +
       "- mcooler:<state> -> forces the machine cooler to passed state [off; medium; high]\n" +
-      "- release:<actuator> -> releases the state of an actuator that was forced [econditioner; mswitch; mcooler]\n";
+      "- release:<actuator> -> releases the state of an actuator that was forced [econditioner; mswitch; mcooler, all]\n";
 
   public MainMenu(Environment envController, Machine mahController) {
     envControllerRef = envController;
