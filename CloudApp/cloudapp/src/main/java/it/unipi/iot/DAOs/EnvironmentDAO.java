@@ -15,7 +15,7 @@ public class EnvironmentDAO {
   static public void createTable() {
     try (Connection conn = HikariPoolDataSource.getConnection()) {
       final String query = String.format(
-          "CREATE TABLE IF NOT EXISTS %s(id INT AUTO_INCREMENT, temperature INT NOT NULL, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id));",
+          "CREATE TABLE IF NOT EXISTS %s(id INT AUTO_INCREMENT, temperature INT NOT NULL, ac_state VARCHAR(30) NOT NULL, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id));",
           tableName);
 
       Logger.INFO("cloud", String.format("Creating table %s", tableName));
@@ -30,8 +30,8 @@ public class EnvironmentDAO {
 
   static public EnvironmentData saveData(EnvironmentData newData) {
     try (Connection conn = HikariPoolDataSource.getConnection()) {
-      final String query = String.format("INSERT INTO %s (temperature) VALUES (%d);",
-          tableName, newData.getTemperature());
+      final String query = String.format("INSERT INTO %s (temperature, ac_state) VALUES (%d, '%s');",
+          tableName, newData.getTemperature(), newData.getActuatorState());
 
       Statement stmt = conn.createStatement();
       int affectedRows = stmt.executeUpdate(query, Statement.RETURN_GENERATED_KEYS);
@@ -43,7 +43,8 @@ public class EnvironmentDAO {
         final String retrieveQuery = String.format("SELECT * FROM %s WHERE id=%d", tableName, generatedId);
         results = stmt.executeQuery(retrieveQuery);
         if (results.next()) {
-          return new EnvironmentData(results.getInt("id"), results.getTimestamp("date"), results.getInt("temperature"));
+          return new EnvironmentData(results.getInt("id"), results.getTimestamp("date"), results.getInt("temperature"),
+              results.getString("ac_state"));
         } else {
           throw new SQLException("Data not saved correctly");
         }

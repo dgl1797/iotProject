@@ -6,15 +6,30 @@ public class EnvironmentData {
   private int id;
   private Timestamp date;
   private int temperature;
+  private int actuatorState;
 
-  public EnvironmentData(int temperature) {
+  public EnvironmentData(int temperature, int actuatorState) {
     this.temperature = temperature;
+    this.actuatorState = actuatorState;
   }
 
-  public EnvironmentData(int id, Timestamp timestamp, int temperature) {
+  public EnvironmentData(int id, Timestamp timestamp, int temperature, int actuatorState) {
     this.id = id;
     this.date = timestamp;
     this.temperature = temperature;
+    this.actuatorState = actuatorState;
+  }
+
+  private int convertStateString(String stateString) {
+    stateString = stateString.toLowerCase();
+    return stateString.equals("off") ? 0 : stateString.equals("heating") ? 1 : 2;
+  }
+
+  public EnvironmentData(int id, Timestamp timestamp, int temperature, String actuatorState) {
+    this.id = id;
+    this.date = timestamp;
+    this.temperature = temperature;
+    this.actuatorState = convertStateString(actuatorState);
   }
 
   public int getId() {
@@ -41,9 +56,18 @@ public class EnvironmentData {
     this.temperature = temperature;
   }
 
+  public String getActuatorState() {
+    return this.actuatorState == 0 ? "off" : this.actuatorState == 1 ? "heating" : "cooling";
+  }
+
+  public void setActuatorState(int actuatorState) {
+    this.actuatorState = actuatorState;
+  }
+
   @Override
   public String toString() {
-    return String.format("{\"id\":%d, \"date\":%s, \"temperature\":%d}", getId(), getDate(), getTemperature());
+    return String.format("{\"id\":%d, \"date\":%s, \"temperature\":%d, \"ac_state\":\"%s\"}", getId(), getDate(),
+        getTemperature(), getActuatorState());
   }
 
 }

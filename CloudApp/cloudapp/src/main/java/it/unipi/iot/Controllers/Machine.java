@@ -37,7 +37,7 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
                                                     * stopped, upperBound, the machine produces extremely more than
                                                     * expected and probabily wil produce bad paper
                                                     */
-  int[] ac_Ac_State = { 0, 0 };
+  int[] ac_Ac_State = { 0, 0 }; // ac_Ac_State[0] is cooler; ac_Ac_State[1] is switch
   LinkedList<Integer> productionHistory = new LinkedList<>();
 
   private boolean forcedSwitch = false;
@@ -168,8 +168,9 @@ public class Machine implements MqttCallback, IMqttMessageListener, Runnable {
         if (productionHistory.size() > 3)
           machineProductionLevelController(mean);
         // temperature checks
-        machineTemperatureController(temperature);
-        MachineData returnedData = MachineDAO.saveData(new MachineData(temperature, humidity, outputs));
+        if (ac_Ac_State[1] != 1)
+          machineTemperatureController(temperature);
+        MachineData returnedData = MachineDAO.saveData(new MachineData(temperature, humidity, outputs, ac_Ac_State[0]));
         if (returnedData == null)
           throw new SQLException("Failed to store data");
       } catch (ParseException e) {

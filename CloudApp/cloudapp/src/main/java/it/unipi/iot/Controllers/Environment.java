@@ -135,7 +135,7 @@ public class Environment implements MqttCallback, IMqttMessageListener, Runnable
         Logger.INFO("env", String.format("New data received: %d°C", temperature));
         if (!stateForced)
           environmentTemperatureController(temperature);
-        EnvironmentData storedData = EnvironmentDAO.saveData(new EnvironmentData(temperature));
+        EnvironmentData storedData = EnvironmentDAO.saveData(new EnvironmentData(temperature, actualState));
         if (storedData == null)
           throw new SQLException("Failed to store data");
       } catch (ParseException e) {

@@ -8,19 +8,36 @@ public class MachineData {
   private int temperature;
   private int humidity;
   private int outputs;
+  private int actuatorState;
 
-  public MachineData(int temperature, int humidity, int outputs) {
+  public MachineData(int temperature, int humidity, int outputs, int actuatorState) {
     this.temperature = temperature;
     this.humidity = humidity;
     this.outputs = outputs;
+    this.actuatorState = actuatorState;
   }
 
-  public MachineData(int id, Timestamp date, int temperature, int humidity, int outputs) {
+  public MachineData(int id, Timestamp date, int temperature, int humidity, int outputs, int actuatorState) {
     this.temperature = temperature;
     this.humidity = humidity;
     this.outputs = outputs;
     this.id = id;
     this.date = date;
+    this.actuatorState = actuatorState;
+  }
+
+  private int convertStateString(String actuatorState) {
+    actuatorState = actuatorState.toLowerCase();
+    return actuatorState.equals("off") ? 0 : actuatorState.equals("medium") ? 1 : 2;
+  }
+
+  public MachineData(int id, Timestamp date, int temperature, int humidity, int outputs, String actuatorState) {
+    this.temperature = temperature;
+    this.humidity = humidity;
+    this.outputs = outputs;
+    this.id = id;
+    this.date = date;
+    this.actuatorState = convertStateString(actuatorState);
   }
 
   public int getId() {
@@ -63,11 +80,16 @@ public class MachineData {
     this.outputs = outputs;
   }
 
+  public String getActuatorState() {
+    return actuatorState == 0 ? "off" : actuatorState == 1 ? "medium" : "high";
+  }
+
   @Override
   public String toString() {
-    return String.format("{\"id\":%d,\"date\":%s,\"temperature\":%d,\"humidity\":%d,\"outputs\":%d}", getId(),
+    return String.format(
+        "{\"id\":%d,\"date\":%s,\"temperature\":%d,\"humidity\":%d,\"outputs\":%d, \"ac_state\":\"%s\"}", getId(),
         getDate(), getTemperature(),
-        getHumidity(), getOutputs());
+        getHumidity(), getOutputs(), getActuatorState());
   }
 
 }

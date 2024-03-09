@@ -15,7 +15,7 @@ public class MachineDAO {
   static public void createTable() {
     try (Connection conn = HikariPoolDataSource.getConnection()) {
       final String query = String.format(
-          "CREATE TABLE IF NOT EXISTS %s(id INT AUTO_INCREMENT, temperature INT NOT NULL, humidity INT NOT NULL, outputs INT NOT NULL, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id));",
+          "CREATE TABLE IF NOT EXISTS %s (id INT AUTO_INCREMENT, temperature INT NOT NULL, humidity INT NOT NULL, outputs INT NOT NULL, ac_state VARCHAR(30) NOT NULL, date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id));",
           tableName);
 
       Logger.INFO("cloud", String.format("Creating table %s", tableName));
@@ -30,8 +30,9 @@ public class MachineDAO {
 
   static public MachineData saveData(MachineData newData) {
     try (Connection conn = HikariPoolDataSource.getConnection()) {
-      final String query = String.format("INSERT INTO %s (temperature, humidity, outputs) VALUES (%d, %d, %d);",
-          tableName, newData.getTemperature(), newData.getHumidity(), newData.getOutputs());
+      final String query = String.format(
+          "INSERT INTO %s (temperature, humidity, outputs, ac_state) VALUES (%d, %d, %d, '%s');",
+          tableName, newData.getTemperature(), newData.getHumidity(), newData.getOutputs(), newData.getActuatorState());
 
       Statement stmt = conn.createStatement();
       int affectedRows = stmt.executeUpdate(query, Statement.RETURN_GENERATED_KEYS);
@@ -44,7 +45,7 @@ public class MachineDAO {
         results = stmt.executeQuery(retrieveQuery);
         if (results.next()) {
           return new MachineData(results.getInt("id"), results.getTimestamp("date"), results.getInt("temperature"),
-              results.getInt("humidity"), results.getInt("outputs"));
+              results.getInt("humidity"), results.getInt("outputs"), results.getString("ac_state"));
         } else {
           throw new SQLException("Data not saved correctly");
         }
